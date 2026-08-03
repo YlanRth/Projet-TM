@@ -23,10 +23,20 @@ namespace RaylibTest
         public float RespawnTimer = 0f; // Le compteur de temps actuel
         public float RespawnDelay = 3f; // Le temps d'attente en secondes 
     }
+    public class Slime
+    {
+        public Rectangle body;
+        public Color Color;
+        public bool isAllied = false;
+
+        public List<string> dialogue = new List<string>();
+
+    }
     internal class Program
     {
         static void Main(string[] args)
         {
+            bool devMode = false;
 
             Raylib.SetConfigFlags(ConfigFlags.FullscreenMode);
 
@@ -58,12 +68,18 @@ namespace RaylibTest
 
             bool canWallJump = false;         // Bloque ou autorise le walljump
             bool isInDialogue = false;        // Met le jeu en "pause" pendant que le slime parle
-            int dialogueStep = -1;             // Étape actuelle du dialogue
+            int dialogueStep = -1;            // Étape actuelle du dialogue
+            Slime? currentTalkingSlime = null; // avec quel slime on parle  
 
             float waterTime = 5f;
             bool isInWater = false;
 
+            List<Slime> slimes = new List<Slime>
+            {
 
+            };
+
+            //initialisation des dialogues et des slimes
             List<string> walljumpDialogue = new List<string>
             {
                 "Slime: Merci de m'avoir liberé ! Ces monstres m'ont enfermé dans cette prison de glace, je ne pouvais rien faire sans geler.",
@@ -71,6 +87,12 @@ namespace RaylibTest
                 "Slime: Tu es le dernier espoir d'un monde sans tyrannie...",
                 "Systeme: Walljump debloqué !"
             };
+            // Création du slime
+            Slime slimeW = new Slime();
+            slimeW.dialogue = walljumpDialogue; // On associe la liste directement
+            slimeW.body = new Rectangle(3450, 825, 50, 50);
+            slimeW.Color = new Color(101, 255, 0, 255);
+            slimes.Add(slimeW);
 
             // Liste de toutes les plateformes
             List<Rectangle> platforms = new List<Rectangle>
@@ -102,7 +124,7 @@ namespace RaylibTest
                 new Rectangle(3175,475,400,200),
                 new Rectangle(3175,475,200,875),
                 new Rectangle(3175,875,400,100),
-                new Rectangle(450,-2000,200,1700),
+                new Rectangle(450,-3000,200,2700),
                 new Rectangle(675,-500,25,100),
                 new Rectangle(675,-600,25,100),
                 new Rectangle(900,-700,25,100),
@@ -112,7 +134,10 @@ namespace RaylibTest
                 new Rectangle(675,-1100,25,100),
                 new Rectangle(1800,-1350,25,150),
                 new Rectangle(650,-1350,1000,25),
-                new Rectangle(800,-1800,1000,25)
+                new Rectangle(800,-1800,1125,25),
+                new Rectangle(1925,-1800,1000,250),
+                new Rectangle(2925,-2800,1000,1250),
+                new Rectangle(1650,-2800,1275,500)
 
 
             };
@@ -143,8 +168,8 @@ namespace RaylibTest
                 new Rectangle(675,-1000,25,100),
                 new Rectangle(900,-1100,25,100),
                 new Rectangle(925,-1100,500,25),
-                new Rectangle(1925,-2000,1000,1700),
-                new Rectangle(650,-2000,1000,25)
+                new Rectangle(1925,-1550,1000,1250),
+                new Rectangle(650,-3000,1000,1025)
             };
 
             List<Stalactite> stalactites = new List<Stalactite>
@@ -194,11 +219,12 @@ namespace RaylibTest
             float stalactiteGravity = 1200f; // Gravité propre à la stalactite pour qu'elle tombe vite !
 
 
-            Rectangle slime1Barrier = new Rectangle(3625, 675, 25, 200);
-            bool slime1LeverActivated = false; // Le levier commence "non activé"
-            Rectangle slime1LeverTrigger = new Rectangle(3675, 905, 40, 40);
+
             float interactionRadius = 200f; // Distance max pour interagir avec le levier
-            Rectangle slime1 = new Rectangle(3450, 825, 50, 50);
+            Rectangle slimeWBarrier = new Rectangle(3625, 675, 25, 200);
+            bool slimeWLeverActivated = false; // Le levier commence "non activé"
+            Rectangle slimeWLeverTrigger = new Rectangle(3675, 905, 40, 40);
+
 
 
             // Chargement du sprite
@@ -372,12 +398,12 @@ namespace RaylibTest
                 playerpos.X += moveX;
                 player.X = playerpos.X;
 
-                if (!slime1LeverActivated) // On ne teste la collision que si la barrière est fermée
+                if (!slimeWLeverActivated) // On ne teste la collision que si la barrière est fermée
                 {
-                    if (Raylib.CheckCollisionRecs(player, slime1Barrier))
+                    if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
                     {
-                        if (moveX > 0) playerpos.X = slime1Barrier.X - player.Width;
-                        else if (moveX < 0) playerpos.X = slime1Barrier.X + slime1Barrier.Width;
+                        if (moveX > 0) playerpos.X = slimeWBarrier.X - player.Width;
+                        else if (moveX < 0) playerpos.X = slimeWBarrier.X + slimeWBarrier.Width;
                         player.X = playerpos.X;
                         currentSpeedX = 0;
                     }
@@ -428,6 +454,23 @@ namespace RaylibTest
                 if (Raylib.IsKeyPressed(KeyboardKey.P))
                 {
                     canWallJump = true;
+                    devMode = true;
+                }
+                if (devMode)
+                {
+                    // Clic Droit : Téléportation en tenant compte de la caméra
+                    if (Raylib.IsMouseButtonPressed(MouseButton.Right))
+                    {
+                        // Obtient la position de la souris à l'écran
+                        Vector2 mouseScreenPos = Raylib.GetMousePosition();
+
+                        // La convertit en coordonnées dans le monde du jeu grâce à la caméra
+                        Vector2 mouseWorldPos = Raylib.GetScreenToWorld2D(mouseScreenPos, camera);
+
+                        // Repositionne le joueur
+                        playerpos.X = mouseWorldPos.X - (hitboxWidth / 2f);
+                        playerpos.Y = mouseWorldPos.Y - (hitboxHeight / 2f);
+                    }
                 }
 
                 // On vérifie si ces capteurs touchent une plateforme normale
@@ -486,19 +529,19 @@ namespace RaylibTest
                 playerpos.Y += moveY;
                 player.Y = playerpos.Y;
 
-                if (!slime1LeverActivated)
+                if (!slimeWLeverActivated)
                 {
-                    if (Raylib.CheckCollisionRecs(player, slime1Barrier))
+                    if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
                     {
                         if (downspeed > 0)
                         {
-                            playerpos.Y = slime1Barrier.Y - player.Height;
+                            playerpos.Y = slimeWBarrier.Y - player.Height;
                             downspeed = 0;
                             isGrounded = true;
                         }
                         else if (downspeed < 0)
                         {
-                            playerpos.Y = slime1Barrier.Y + slime1Barrier.Height;
+                            playerpos.Y = slimeWBarrier.Y + slimeWBarrier.Height;
                             downspeed = 0;
                         }
                         player.Y = playerpos.Y;
@@ -623,7 +666,7 @@ namespace RaylibTest
                         if (Raylib.CheckCollisionRecs(player, stal.Hitbox))
                         {
                             stal.IsDestroyed = true;
-                            wallJumpLockTimer=0.2f;  //Permet d'éviter que le joueur se raccroche au mur a la frame après s'être fait toucher 
+                            wallJumpLockTimer = 0.8f;  //Permet d'éviter que le joueur se raccroche au mur a la frame après s'être fait toucher 
 
                             // --- SYSTÈME DE KNOCKBACK CORRIGÉ ---
                             float pushDirection = 0f;
@@ -664,9 +707,9 @@ namespace RaylibTest
 
                 // --- INTERACTION LEVIER ---
                 Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
-                Vector2 leverCenter = new Vector2(slime1LeverTrigger.X + slime1LeverTrigger.Width / 2, slime1LeverTrigger.Y + slime1LeverTrigger.Height / 2);
+                Vector2 leverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
 
-                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slime1LeverActivated)
+                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slimeWLeverActivated)
                 {
                     // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
                     if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue)
@@ -674,22 +717,28 @@ namespace RaylibTest
                         isInDialogue = true;
                         dialogueStep = -1;
                         currentSpeedX = 0; // On stoppe net le joueur
-                        slime1LeverActivated = true;    // La barrière s'ouvre !
+                        slimeWLeverActivated = true;    // La barrière s'ouvre !
+                        currentTalkingSlime = slimeW;
                     }
                 }
 
                 // --- GESTION DE LA PROGRESSION DU DIALOGUE ---
-                if (isInDialogue)
+                if (isInDialogue && currentTalkingSlime != null)
                 {
                     if (Raylib.IsKeyPressed(KeyboardKey.E) || Raylib.IsKeyPressed(KeyboardKey.Space))
                     {
                         dialogueStep++;
 
                         // Si on a lu toutes les lignes
-                        if (dialogueStep >= walljumpDialogue.Count)
+                        if (dialogueStep >= currentTalkingSlime.dialogue.Count)
                         {
                             isInDialogue = false;           // On ferme la boîte de dialogue
-                            canWallJump = true;             // Le joueur obtient le walljump !
+                            canWallJump = true;
+                            // Le joueur obtient le walljump !
+                            // Passer le bon slime en allié
+                            currentTalkingSlime.isAllied = true;
+                            // Réinitialiser la référence
+                            currentTalkingSlime = null;
                         }
                     }
                 }
@@ -784,24 +833,28 @@ namespace RaylibTest
                 }
 
                 // Dessiner le levier (Rouge = Fermé, Vert = Ouvert)
-                Color leverColor = slime1LeverActivated ? Color.Green : Color.Red;
-                Raylib.DrawRectangleRec(slime1LeverTrigger, leverColor);
+                Color leverColor = slimeWLeverActivated ? Color.Green : Color.Red;
+                Raylib.DrawRectangleRec(slimeWLeverTrigger, leverColor);
 
                 // Afficher un petit texte d'indication si le joueur est proche
-                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slime1LeverActivated)
+                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slimeWLeverActivated)
                 {
-                    Raylib.DrawText("Appuyez sur E", (int)slime1LeverTrigger.X - 20, (int)slime1LeverTrigger.Y - 20, 10, Color.White);
+                    Raylib.DrawText("Appuyez sur E", (int)slimeWLeverTrigger.X - 20, (int)slimeWLeverTrigger.Y - 20, 10, Color.White);
                 }
 
                 // Dessiner la barrière seulement si elle est fermée
-                if (!slime1LeverActivated)
+                if (!slimeWLeverActivated)
                 {
-                    Raylib.DrawRectangleRec(slime1Barrier, Raylib.Fade(Color.Gray, 0.8f));
+                    Raylib.DrawRectangleRec(slimeWBarrier, Raylib.Fade(Color.Gray, 0.8f));
                 }
 
-                if (!canWallJump)
+                foreach (var slime in slimes)
                 {
-                    Raylib.DrawRectangleRec(slime1, new Color(101, 255, 0, 255));
+                    // On ne le dessine que s'il n'est pas encore allié
+                    if (!slime.isAllied)
+                    {
+                        Raylib.DrawRectangleRec(slime.body, slime.Color);
+                    }
                 }
 
                 Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
