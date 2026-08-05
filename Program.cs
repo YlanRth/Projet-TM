@@ -66,6 +66,7 @@ namespace RaylibTest
             float wallJumpLockTimer = 0f;
             float maxWallSlideSpeed = 150f;
 
+            bool canSwim = false;
             bool canWallJump = false;         // Bloque ou autorise le walljump
             bool isInDialogue = false;        // Met le jeu en "pause" pendant que le slime parle
             int dialogueStep = -1;            // Étape actuelle du dialogue
@@ -313,7 +314,6 @@ namespace RaylibTest
                         break;
                     }
                 }
-
                 // 2. On regarde si on touche une plateforme normale
                 if (!isOnIce)
                 {
@@ -326,10 +326,23 @@ namespace RaylibTest
                         }
                     }
                 }
+                foreach (var wat in water)
+                {
+                    if (Raylib.CheckCollisionRecs(player, wat))
+                    {
+                        isInWater = true;
+                        break;
+                    }
+                }
 
                 // 3. ON APPLIQUE LES RÈGLES UNIQUEMENT SI ON EST TOUCHÉ PAR UN SOL
                 // Si on est en l'air, on ne rentre pas dans ces conditions, donc on GARDE l'inertie du dernier sol !
-                if (isOnIce)
+                if (isInWater)
+                {
+                    // L'eau prime sur le sol : on réduit la vitesse max même si on touche le fond
+                    maxSpeedX = 150f;
+                }
+                else if (isOnIce)
                 {
                     acceleration = 500f;
                     maxSpeedX = 400f;
@@ -432,15 +445,7 @@ namespace RaylibTest
                     }
                 }
 
-                foreach (var wat in water)
-                {
-                    if (Raylib.CheckCollisionRecs(player, wat))
-                    {
-                        isInWater = true;
-                        maxSpeedX = 150f;
-                        break;
-                    }
-                }
+
 
                 // --- DÉTECTION DES MURS POUR LE WALL JUMP ---
                 isTouchingWallLeft = false;
@@ -454,6 +459,7 @@ namespace RaylibTest
                 if (Raylib.IsKeyPressed(KeyboardKey.P))
                 {
                     canWallJump = true;
+                    canSwim = true;
                     devMode = true;
                 }
                 if (devMode)
@@ -519,9 +525,59 @@ namespace RaylibTest
                 }
 
                 // La physique de l'eau
+                // --- PHYSIQUE DE L'EAU ET NAGE ---
                 if (isInWater)
                 {
-                    if (downspeed > 150) downspeed = 150;
+                    if (canSwim)
+                    {
+                        // 1. On réinitialise le timer de noyade (le joueur ne meurt plus)
+                        waterTime = 5.0f;
+
+                        // 2. Trouver la surface de l'eau qu'on touche
+                        Rectangle currentWater = water.FirstOrDefault(w => Raylib.CheckCollisionRecs(player, w));
+
+                        if (currentWater.Width > 0)
+                        {
+                            // Position CIBLE pour que le joueur soit "à moitié submergé"
+                            // Ex: Le haut du joueur dépasse de la moitié de sa hauteur par rapport à la surface
+                            float waterSurfaceY = currentWater.Y - (player.Height / 2f);
+
+                            // Si le joueur est en train de tomber dans l'eau
+                            if (downspeed > 0)
+                            {
+                                // Amortissement de la chute dans l'eau (effet d'impact fluide)
+                                downspeed = Vector2.Lerp(new Vector2(0, downspeed), Vector2.Zero, 10f * deltaTime).Y;
+
+                                // Si le joueur est descendu plus bas que la surface
+                                if (playerpos.Y > waterSurfaceY)
+                                {
+                                    // On le fait flotter doucement vers la surface (poussée d'Archimède)
+                                    playerpos.Y = MathF.Min(playerpos.Y, waterSurfaceY);
+                                    downspeed = 0;
+                                }
+                            }
+                            else if (downspeed == 0 && playerpos.Y > waterSurfaceY)
+                            {
+                                // Flottabilité passive : ramène le personnage à la surface s'il s'enfonce
+                                playerpos.Y = Vector2.Lerp(new Vector2(0, playerpos.Y), new Vector2(0, waterSurfaceY), 8f * deltaTime).Y;
+                            }
+                        }
+
+                        // 3. Vitesse de déplacement horizontal à la surface
+                        maxSpeedX = 200f;
+
+                        // 4. SAUT DEPUIS LA SURFACE
+                        // Permet de sauter hors de l'eau avec la touche Espace
+                        if (Raylib.IsKeyPressed(KeyboardKey.Space))
+                        {
+                            downspeed = -450f; // Impulsion de saut pour sortir du lac
+                        }
+                    }
+                    else
+                    {
+                        // SANS POUVOIR : Le joueur coule et se noie
+                        if (downspeed > 100f) downspeed = 100f;
+                    }
                 }
 
                 float moveY = (float)downspeed * deltaTime;
