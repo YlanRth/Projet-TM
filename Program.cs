@@ -88,12 +88,28 @@ namespace RaylibTest
                 "Slime: Tu es le dernier espoir d'un monde sans tyrannie...",
                 "Systeme: Walljump debloqué !"
             };
+
+            List<string> AirDialogue = new List<string>
+            {
+                "Slime: Halte humain, ne t'approche pas.",
+                "Joueur: Je ne vous veux aucun mal, regardez j'ai déjà un de vos semblables comme ami.",
+                "Slime: Serais-tu le héros de la légende ? Celui qui unira les peuples ?",
+                "Systeme: Nage debloquée !"
+            };
+
+
             // Création du slime
             Slime slimeW = new Slime();
             slimeW.dialogue = walljumpDialogue; // On associe la liste directement
             slimeW.body = new Rectangle(3450, 825, 50, 50);
             slimeW.Color = new Color(101, 255, 0, 255);
             slimes.Add(slimeW);
+
+            Slime slimeA = new Slime();
+            slimeA.dialogue = AirDialogue; // On associe la liste directement
+            slimeA.body = new Rectangle(2000, -1850, 50, 50);
+            slimeA.Color = new Color(255, 255, 255, 100);
+            slimes.Add(slimeA);
 
             // Liste de toutes les plateformes
             List<Rectangle> platforms = new List<Rectangle>
@@ -778,6 +794,21 @@ namespace RaylibTest
                     }
                 }
 
+                Vector2 slimeACenter = new Vector2(slimeA.body.X + slimeA.body.Width / 2, slimeA.body.Y + slimeA.body.Height / 2);
+
+                if (Vector2.Distance(playerCenter, slimeACenter) < 200 && !slimeA.isAllied && playerpos.Y <= -1800)
+                {
+                    // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
+                    if (!isInDialogue)
+                    {
+                        isInDialogue = true;
+                        dialogueStep = 0;
+                        currentSpeedX = 0; // On stoppe net le joueur
+                        currentTalkingSlime = slimeA;
+                    }
+                }
+
+
                 // --- GESTION DE LA PROGRESSION DU DIALOGUE ---
                 if (isInDialogue && currentTalkingSlime != null)
                 {
@@ -788,9 +819,16 @@ namespace RaylibTest
                         // Si on a lu toutes les lignes
                         if (dialogueStep >= currentTalkingSlime.dialogue.Count)
                         {
-                            isInDialogue = false;           // On ferme la boîte de dialogue
-                            canWallJump = true;
-                            // Le joueur obtient le walljump !
+                            isInDialogue = false;          // On ferme la boîte de dialogue
+
+                            if (currentTalkingSlime == slimeW)
+                            {
+                                canWallJump = true;
+                            }
+                            else if (currentTalkingSlime == slimeA)
+                            {
+                                canSwim = true;
+                            }
                             // Passer le bon slime en allié
                             currentTalkingSlime.isAllied = true;
                             // Réinitialiser la référence
@@ -938,7 +976,7 @@ namespace RaylibTest
                     Raylib.DrawRectangleLines(boxX, boxY, boxWidth, boxHeight, Color.White);
 
                     // Affichage du texte de l'étape actuelle
-                    Raylib.DrawText(walljumpDialogue[dialogueStep], boxX + 30, boxY + 40, 24, Color.White);
+                    Raylib.DrawText(currentTalkingSlime.dialogue[dialogueStep], boxX + 30, boxY + 40, 24, Color.White);
 
                     // Petit indicateur pour passer au texte suivant
                     Raylib.DrawText("[E] ou [Espace] pour continuer", boxX + boxWidth - 300, boxY + boxHeight - 30, 16, Color.Gray);
