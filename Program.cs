@@ -22,6 +22,7 @@ namespace RaylibTest
         public float SpawnY;           // Stocke la position Y initiale au plafond
         public float RespawnTimer = 0f; // Le compteur de temps actuel
         public float RespawnDelay = 3f; // Le temps d'attente en secondes 
+        public string Type = "glace";
     }
     public class Slime
     {
@@ -30,6 +31,14 @@ namespace RaylibTest
         public bool isAllied = false;
 
         public List<string> dialogue = new List<string>();
+
+    }
+
+    public class Death
+    {
+
+        public Rectangle Hitbox;
+        public bool isVoid = false;
 
     }
     internal class Program
@@ -47,6 +56,7 @@ namespace RaylibTest
             Vector2 lastSafePosition = playerpos;
             float cameraSmoothing = 5.0f;
 
+            bool isGrounded = false;
             float gravity = 900;
             float downspeed = 0;
             float currentSpeedX = 0f;      // La vitesse horizontale actuelle du joueur
@@ -74,6 +84,20 @@ namespace RaylibTest
 
             float waterTime = 5f;
             bool isInWater = false;
+
+            bool canDoubleJumpAndDash = false;
+            int doubleJumpCounter = 0;
+
+            bool canDash = true;                   // Est-ce-Que le dash a reset (retour au sol ou contre un mur)
+            bool isDashing = false;         // Est-on en train de dasher MAINTENANT ?
+
+            float dashSpeed = 600f;        // Vitesse pendant le dash (très rapide)
+            float dashDuration = 0.3f;     // Durée du dash en secondes
+            float dashTimer = 0f;           // Timer interne pour la durée restante
+
+            float dashCooldown = 0.6f;      // Temps d'attente entre 2 dashs
+            float dashCooldownTimer = 0f;   // Timer de cooldown
+
 
             List<Slime> slimes = new List<Slime>
             {
@@ -114,14 +138,13 @@ namespace RaylibTest
             // Liste de toutes les plateformes
             List<Rectangle> platforms = new List<Rectangle>
             {
-                new Rectangle(0,-400,100, 800),
                 new Rectangle(0, 400, 1000, 100),
                 new Rectangle(800, 200, 200, 200),
                 new Rectangle(500, 275, 200, 125),
                 new Rectangle(1000,250,400,250),
                 new Rectangle(1600,250,400,250),
                 new Rectangle(2000,475,1200,25),
-                new Rectangle(3200,250,400,250),
+                new Rectangle(3200,250,2000,250),
                 new Rectangle(1750,50,200,25),
                 new Rectangle(450,-300,1325,200),
                 new Rectangle(1925,-300,1675,200),
@@ -142,21 +165,21 @@ namespace RaylibTest
                 new Rectangle(3175,475,200,875),
                 new Rectangle(3175,875,400,100),
                 new Rectangle(450,-3000,200,2700),
-                new Rectangle(675,-500,25,100),
-                new Rectangle(675,-600,25,100),
-                new Rectangle(900,-700,25,100),
-                new Rectangle(675,-800,25,100),
-                new Rectangle(675,-900,25,100),
-                new Rectangle(900,-1000,25,100),
-                new Rectangle(675,-1100,25,100),
+                new Rectangle(900,-1000,25,500),
+                new Rectangle(675,-1100,25,700),
                 new Rectangle(1800,-1350,25,150),
                 new Rectangle(650,-1350,1000,25),
                 new Rectangle(800,-1800,1125,25),
                 new Rectangle(1925,-1800,1000,250),
                 new Rectangle(2925,-2800,1000,1250),
-                new Rectangle(1650,-2800,1275,500)
+                new Rectangle(1650,-2800,1275,500),
+                new Rectangle(2925,-1550,2275,1250),
+                new Rectangle(650,-3000,1000,1025),
+            };
 
-
+            List<Rectangle> noWalljumpPlatforms = new List<Rectangle>
+            {
+                new Rectangle(0,-400,100, 800),
             };
 
             List<Rectangle> water = new List<Rectangle>
@@ -186,7 +209,7 @@ namespace RaylibTest
                 new Rectangle(900,-1100,25,100),
                 new Rectangle(925,-1100,500,25),
                 new Rectangle(1925,-1550,1000,1250),
-                new Rectangle(650,-3000,1000,1025)
+                new Rectangle(3600,-300,1400,12)
             };
 
             List<Stalactite> stalactites = new List<Stalactite>
@@ -196,42 +219,52 @@ namespace RaylibTest
                 Hitbox = new Rectangle(4100, 675, 50, 50),
                 // La zone de détection
                 DetectionZone = new Rectangle(4100, 725, 50, 300),
-                SpawnY=675
+                SpawnY=675,
+                Type = "glace"
                 },
             new Stalactite {
                 // La stalactite elle-même
                 Hitbox = new Rectangle(3800, 675, 50, 50),
                 // La zone de détection
                 DetectionZone = new Rectangle(3800, 725, 50, 300),
-                SpawnY=675
+                SpawnY=675,
+                Type = "glace"
                 },
             new Stalactite {
                 // La stalactite elle-même
                 Hitbox = new Rectangle(4325, 675, 50, 50),
                 // La zone de détection
                 DetectionZone = new Rectangle(4325, 725, 50, 475),
-                SpawnY=675
+                SpawnY=675,
+                Type = "glace"
                 },
             new Stalactite {
                 // La stalactite elle-même
                 Hitbox = new Rectangle(4675, 1300, 50, 50),
                 // La zone de détection
                 DetectionZone = new Rectangle(4675, 1300, 50, 500),
-                SpawnY=1300
+                SpawnY=1300,
+                Type = "glace"
                 },
             new Stalactite {
                 // La stalactite elle-même
                 Hitbox = new Rectangle(650, -1975, 50, 50),
                 // La zone de détection
                 DetectionZone = new Rectangle(650, -1975, 50, 500),
-                SpawnY=-1975
+                SpawnY=-1975,
+                Type = "normal"
                 }
             };
             //zones qui declenchent la reaparition (vide)
-            List<Rectangle> deathZone = new List<Rectangle>
+            List<Death> deathZone = new List<Death>
             {
-                new Rectangle(0,1500,1450,100)
+                new Death{
+                    Hitbox= new Rectangle(0,1500,1450,100),
+                    isVoid=true
+                    },
             };
+
+
 
             float stalactiteGravity = 1200f; // Gravité propre à la stalactite pour qu'elle tombe vite !
 
@@ -298,12 +331,33 @@ namespace RaylibTest
                 if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
                 if (isInWater == true) waterTime -= deltaTime;
 
+                if (canDoubleJumpAndDash && (isGrounded || isTouchingWallLeft || isTouchingWallRight))
+                {
+                    doubleJumpCounter = 1;
+                }
+
+                // Rechargement quand on touche le sol ou un mur
+                if (isGrounded || isTouchingWallLeft || isTouchingWallRight || isInWater)
+                {
+                    if (dashCooldownTimer <= 0)
+                    {
+                        canDash = true;
+                    }
+                }
+
+                // Mise à jour du timer de cooldown
+                if (dashCooldownTimer > 0)
+                {
+                    dashCooldownTimer -= deltaTime;
+                }
+
+
                 if (currentSpeedX != 0)
                 {
                     flipX = currentSpeedX > 0 ? 1 : -1;
                 }
 
-                bool isGrounded = false;
+                isGrounded = false;
                 isMoving = false;
                 isInWater = false;
 
@@ -369,7 +423,49 @@ namespace RaylibTest
                     maxSpeedX = 250f;
                 }
 
+
                 // --- 3. DÉPLACEMENT HORIZONTAL (ENTRÉES + FRICTION) ---
+                // --- DÉCLENCHEMENT DU DASH ---
+                if (Raylib.IsKeyPressed(KeyboardKey.LeftShift) && canDash && !isInDialogue && canDoubleJumpAndDash)
+                {
+                    isDashing = true;
+                    canDash = false;
+                    dashTimer = dashDuration;
+                    dashCooldownTimer = dashCooldown;
+
+                }
+
+                // --- ÉTAT PENDANT LE DASH ---
+                if (isDashing)
+                {
+                    dashTimer -= deltaTime;
+
+                    // 1. Vitesse horizontale constante et élevée
+                    currentSpeedX = flipX * dashSpeed;
+
+                    // 2. Annule complètement la gravité pendant le dash
+                    downspeed = 0;
+
+                    // Fin du dash
+                    if (dashTimer <= 0)
+                    {
+                        isDashing = false;
+                        if (isOnIce)
+                        {
+                            currentSpeedX = 400f;
+                        }
+                        else if (isInWater)
+                        {
+                            currentSpeedX = 150f;
+                        }
+                        else
+                        {
+                            currentSpeedX = 250f;
+                        }
+                    }
+                }
+
+
                 bool inputPressed = false;
                 if (!isInDialogue && wallJumpLockTimer <= 0f)
                 {
@@ -386,6 +482,7 @@ namespace RaylibTest
                         inputPressed = true;
                     }
                 }
+
 
                 // Application de la friction selon le sol
                 if (!inputPressed)
@@ -416,9 +513,11 @@ namespace RaylibTest
                 }
 
                 // Limitation de la vitesse max
-                if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
-                if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
-
+                if (!isDashing)
+                {
+                    if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                    if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
+                }
                 // Forcer l'animation si le personnage glisse
                 if (MathF.Abs(currentSpeedX) > 10f) isMoving = true;
 
@@ -439,6 +538,18 @@ namespace RaylibTest
                 }
 
                 foreach (var plat in platforms)
+                {
+                    if (Raylib.CheckCollisionRecs(player, plat))
+                    {
+                        if (moveX > 0) playerpos.X = plat.X - player.Width;
+                        else if (moveX < 0) playerpos.X = plat.X + plat.Width;
+                        player.X = playerpos.X;
+                        currentSpeedX = 0;
+                        maxSpeedX = 250f;
+                        if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                    }
+                }
+                foreach (var plat in noWalljumpPlatforms)
                 {
                     if (Raylib.CheckCollisionRecs(player, plat))
                     {
@@ -476,6 +587,7 @@ namespace RaylibTest
                 {
                     canWallJump = true;
                     canSwim = true;
+                    canDoubleJumpAndDash = true;
                     devMode = true;
                 }
                 if (devMode)
@@ -522,9 +634,6 @@ namespace RaylibTest
                 }
 
                 sourceRec.Width = frameWidth * flipX;
-
-                // --- 6. PHYSIQUE ET COLLISIONS Y ---
-
 
                 // --- 6. PHYSIQUE ET COLLISIONS Y ---
 
@@ -639,6 +748,25 @@ namespace RaylibTest
                     }
                 }
 
+                foreach (var plat in noWalljumpPlatforms)
+                {
+                    if (Raylib.CheckCollisionRecs(player, plat))
+                    {
+                        if (downspeed > 0)
+                        {
+                            playerpos.Y = plat.Y - player.Height;
+                            downspeed = 0;
+                            isGrounded = true;
+                        }
+                        else if (downspeed < 0)
+                        {
+                            playerpos.Y = plat.Y + plat.Height;
+                            downspeed = 0;
+                        }
+                        player.Y = playerpos.Y;
+                    }
+                }
+
                 foreach (var gla in ice)
                 {
                     if (Raylib.CheckCollisionRecs(player, gla))
@@ -695,6 +823,12 @@ namespace RaylibTest
                         jumpBufferCounter = 0;
                         coyoteTimeCounter = 0;
                         wallJumpLockTimer = 0.4f;
+                    }
+                    else if (canDoubleJumpAndDash && doubleJumpCounter != 0 && !isGrounded)
+                    {
+                        downspeed = -450;
+                        doubleJumpCounter = 0;
+                        jumpBufferCounter = 0;
                     }
                 }
 
@@ -839,7 +973,7 @@ namespace RaylibTest
 
                 foreach (var death in deathZone)
                 {
-                    if (Raylib.CheckCollisionRecs(player, death))
+                    if (Raylib.CheckCollisionRecs(player, death.Hitbox))
                     {
                         // Téléportation au dernier sol stable
                         playerpos = lastSafePosition;
@@ -878,6 +1012,10 @@ namespace RaylibTest
                 foreach (var plat in platforms)
                 {
                     Raylib.DrawRectangleRec(plat, new Color(46, 63, 89, 255));
+                }
+                foreach (var plat in noWalljumpPlatforms)
+                {
+                    Raylib.DrawRectangleRec(plat, new Color(22, 31, 43, 255));
                 }
 
                 foreach (var gla in ice)
@@ -921,9 +1059,15 @@ namespace RaylibTest
                     // AFFICHER LA ZONE DE DÉTECTION
                     Raylib.DrawRectangleRec(stal.DetectionZone, Raylib.Fade(Color.Orange, 0.1f));
 
-                    // DESSINER LA STALACTITE (Un triangle blanc ou un rectangle pour l'instant)
-                    // Ici on fait un rectangle
-                    Raylib.DrawRectangleRec(stal.Hitbox, new Color(200, 245, 255, 255));
+                    // DESSINER LA STALACTITE
+                    if (stal.Type == "glace")
+                    {
+                        Raylib.DrawRectangleRec(stal.Hitbox, new Color(200, 245, 255, 255));
+                    }
+                    else if (stal.Type == "normal")
+                    {
+                        Raylib.DrawRectangleRec(stal.Hitbox, new Color(61, 84, 117, 255));
+                    }
                 }
 
                 // Dessiner le levier (Rouge = Fermé, Vert = Ouvert)
@@ -954,7 +1098,14 @@ namespace RaylibTest
                 Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
                 foreach (var death in deathZone)
                 {
-                    Raylib.DrawRectangleRec(death, Raylib.Fade(Color.Black, 0.4f));
+                    if (death.isVoid)
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
+                    }
+                    else
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, new Color(240, 240, 240, 255));
+                    }
                 }
 
                 Raylib.EndMode2D();
