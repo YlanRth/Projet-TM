@@ -49,12 +49,32 @@ namespace RaylibTest
 
             Raylib.SetConfigFlags(ConfigFlags.FullscreenMode);
 
-
             Raylib.InitWindow(0, 0, "Slime Thing");
             Raylib.SetTargetFPS(60);
             Vector2 playerpos = new Vector2(325, 300);
             Vector2 lastSafePosition = playerpos;
             float cameraSmoothing = 5.0f;
+
+            int lightSize = 600;
+            RenderTexture2D lightMask = Raylib.LoadRenderTexture(lightSize, lightSize);
+
+            Raylib.BeginTextureMode(lightMask);
+            // 1. On nettoie la texture en la rendant totalement transparente
+            Raylib.ClearBackground(Color.Blank);
+
+            // 2. On dessine un cercle en mode Alpha classique
+            // Centre : Alpha = 0 (Totalement transparent -> le jeu apparaît nettement)
+            // Bords  : Alpha = 220 (Noir semi-opaque -> fondu parfait vers l'obscurité)
+            Raylib.BeginBlendMode(BlendMode.Alpha);
+            Raylib.DrawCircleGradient(
+                lightSize / 2,
+                lightSize / 2,
+                lightSize / 2,
+                new Color(0, 0, 0, 0),      // Centre : Transparent
+                new Color(0, 0, 0, 220)     // Bords : Obscurité
+            );
+            Raylib.EndBlendMode();
+            Raylib.EndTextureMode();
 
             bool isGrounded = false;
             float gravity = 900;
@@ -1107,7 +1127,28 @@ namespace RaylibTest
                         Raylib.DrawRectangleRec(death.Hitbox, new Color(240, 240, 240, 255));
                     }
                 }
+                if (!devMode)
+                {
+                    // --- DESSINER L'OMBRE AUTOUR DU JOUEUR ---
 
+                    // Rectangle source de la texture (Inversé sur Y comme toujours dans Raylib)
+                    Rectangle maskSrcRec = new Rectangle(0, 0, lightMask.Texture.Width, -lightMask.Texture.Height);
+
+                    // Rectangle de destination centré sur le joueur
+                    Rectangle maskDestRec = new Rectangle(
+                        playerpos.X + player.Width / 2 - lightSize / 2f,
+                        playerpos.Y + player.Height / 2 - lightSize / 2f,
+                        lightSize,
+                        lightSize
+                    );
+
+                    // Dessin de la lumière
+                    Raylib.DrawTexturePro(lightMask.Texture, maskSrcRec, maskDestRec, Vector2.Zero, 0f, Color.White);
+
+                    // 2. Remplir le reste de la carte autour du carré de lumière
+                    Raylib.DrawRing(new Vector2(playerpos.X+player.Width/2,playerpos.Y+player.Height/2),lightSize/2-2,5000f,0,360,60,new Color(0, 0, 0, 220));
+
+                }
                 Raylib.EndMode2D();
 
                 // --- RENDU DU DIALOGUE (FIXE À L'ÉCRAN) ---
@@ -1138,6 +1179,7 @@ namespace RaylibTest
 
             Raylib.CloseWindow();
             Raylib.UnloadTexture(knightSprite);
+            Raylib.UnloadRenderTexture(lightMask);
         }
     }
 }
