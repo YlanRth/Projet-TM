@@ -62,20 +62,18 @@ namespace RaylibTest
             // 1. On nettoie la texture en la rendant totalement transparente
             Raylib.ClearBackground(Color.Blank);
 
-            // 2. On dessine un cercle en mode Alpha classique
-            // Centre : Alpha = 0 (Totalement transparent -> le jeu apparaît nettement)
-            // Bords  : Alpha = 220 (Noir semi-opaque -> fondu parfait vers l'obscurité)
+            // 2. On dessine un cercle)
             Raylib.BeginBlendMode(BlendMode.Alpha);
             Raylib.DrawCircleGradient(
                 lightSize / 2,
                 lightSize / 2,
                 lightSize / 2,
                 new Color(0, 0, 0, 0),      // Centre : Transparent
-                new Color(0, 0, 0, 220)     // Bords : Obscurité
+                new Color(0, 0, 0, 255)     // Bords : Obscurité
             );
             Raylib.EndBlendMode();
             Raylib.EndTextureMode();
-
+            bool isPlaying = false;
             bool isGrounded = false;
             float gravity = 900;
             float downspeed = 0;
@@ -339,6 +337,7 @@ namespace RaylibTest
                 (int)hitboxWidth,
                 (int)hitboxHeight
             );
+            playerpos.Y = -500;
 
             Camera2D camera = new Camera2D();
             camera.Offset = new Vector2(Raylib.GetScreenWidth() / 2, Raylib.GetScreenHeight() / 2);
@@ -346,6 +345,7 @@ namespace RaylibTest
 
             while (!Raylib.WindowShouldClose())
             {
+
                 float deltaTime = Raylib.GetFrameTime();
 
                 if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
@@ -446,7 +446,7 @@ namespace RaylibTest
 
                 // --- 3. DÉPLACEMENT HORIZONTAL (ENTRÉES + FRICTION) ---
                 // --- DÉCLENCHEMENT DU DASH ---
-                if (Raylib.IsKeyPressed(KeyboardKey.LeftShift) && canDash && !isInDialogue && canDoubleJumpAndDash)
+                if (Raylib.IsKeyPressed(KeyboardKey.LeftShift) && canDash && !isInDialogue && canDoubleJumpAndDash && isPlaying)
                 {
                     isDashing = true;
                     canDash = false;
@@ -487,7 +487,7 @@ namespace RaylibTest
 
 
                 bool inputPressed = false;
-                if (!isInDialogue && wallJumpLockTimer <= 0f)
+                if (!isInDialogue && wallJumpLockTimer <= 0f && isPlaying)
                 {
                     if (Raylib.IsKeyDown(KeyboardKey.A))
                     {
@@ -603,7 +603,7 @@ namespace RaylibTest
                 Rectangle rightSensor = new Rectangle(player.X + player.Width, player.Y + 4, 2, player.Height - 8);
 
                 //outils de debug
-                if (Raylib.IsKeyPressed(KeyboardKey.P))
+                if (Raylib.IsKeyPressed(KeyboardKey.P) && isPlaying)
                 {
                     canWallJump = true;
                     canSwim = true;
@@ -656,9 +656,10 @@ namespace RaylibTest
                 sourceRec.Width = frameWidth * flipX;
 
                 // --- 6. PHYSIQUE ET COLLISIONS Y ---
-
-                downspeed += gravity * deltaTime;
-
+                if (isPlaying)
+                {
+                    downspeed += gravity * deltaTime;
+                }
                 // --- GLISSEMENT SUR LE MUR (WALL SLIDE) ---
                 // On vérifie si le joueur touche un mur, qu'il est en l'air (!isGrounded), qu'il descend (downspeed > 0) et qu'il puisse wallJump
                 if ((isTouchingWallLeft || isTouchingWallRight) && !isGrounded && downspeed > 0 && canWallJump)
@@ -713,7 +714,7 @@ namespace RaylibTest
 
                         // 4. SAUT DEPUIS LA SURFACE
                         // Permet de sauter hors de l'eau avec la touche Espace
-                        if (Raylib.IsKeyPressed(KeyboardKey.Space))
+                        if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
                         {
                             downspeed = -450f; // Impulsion de saut pour sortir du lac
                         }
@@ -807,7 +808,7 @@ namespace RaylibTest
                 }
 
                 // --- 7. SENSORS SAUT / COYOTE TIME ---
-                if (Raylib.IsKeyPressed(KeyboardKey.Space)) jumpBufferCounter = jumpBufferDuration;
+                if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying) jumpBufferCounter = jumpBufferDuration;
                 else jumpBufferCounter -= deltaTime;
 
                 if (isGrounded && !isInWater)
@@ -931,6 +932,7 @@ namespace RaylibTest
                     }
                 }
 
+
                 // --- INTERACTION LEVIER ---
                 Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
                 Vector2 leverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
@@ -938,7 +940,7 @@ namespace RaylibTest
                 if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slimeWLeverActivated)
                 {
                     // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
-                    if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue)
+                    if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue && isPlaying)
                     {
                         isInDialogue = true;
                         dialogueStep = -1;
@@ -966,7 +968,7 @@ namespace RaylibTest
                 // --- GESTION DE LA PROGRESSION DU DIALOGUE ---
                 if (isInDialogue && currentTalkingSlime != null)
                 {
-                    if (Raylib.IsKeyPressed(KeyboardKey.E) || Raylib.IsKeyPressed(KeyboardKey.Space))
+                    if (Raylib.IsKeyPressed(KeyboardKey.E) || Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
                     {
                         dialogueStep++;
 
@@ -1023,6 +1025,9 @@ namespace RaylibTest
                     //reset du temps
                     waterTime = 5;
                 }
+
+
+
 
                 // --- 8. RENDU / DESSIN ---
                 Raylib.BeginDrawing();
@@ -1146,7 +1151,7 @@ namespace RaylibTest
                     Raylib.DrawTexturePro(lightMask.Texture, maskSrcRec, maskDestRec, Vector2.Zero, 0f, Color.White);
 
                     // 2. Remplir le reste de la carte autour du carré de lumière
-                    Raylib.DrawRing(new Vector2(playerpos.X+player.Width/2,playerpos.Y+player.Height/2),lightSize/2-2,5000f,0,360,60,new Color(0, 0, 0, 220));
+                    Raylib.DrawRing(new Vector2(playerpos.X + player.Width / 2, playerpos.Y + player.Height / 2), lightSize / 2 - 2, 5000f, 0, 360, 60, new Color(0, 0, 0, 255));
 
                 }
                 Raylib.EndMode2D();
