@@ -55,6 +55,21 @@ namespace RaylibTest
             Vector2 lastSafePosition = playerpos;
             float cameraSmoothing = 5.0f;
 
+            // Obtenir la résolution dynamique de l'écran (puisque tu es en Fullscreen)
+            int screenWidth = Raylib.GetScreenWidth();
+            int screenHeight = Raylib.GetScreenHeight();
+
+            // 1. Texture cible pour capturer le jeu entier
+            RenderTexture2D gameTarget = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+
+            // 2. Chargement du Shader
+            Shader blurShader = Raylib.LoadShader(null, "blur.fs");
+
+            // On passe la taille de l'écran au shader
+            int renderSizeLoc = Raylib.GetShaderLocation(blurShader, "renderSize");
+            Vector2 renderSize = new Vector2(screenWidth, screenHeight);
+            Raylib.SetShaderValue(blurShader, renderSizeLoc, renderSize, ShaderUniformDataType.Vec2);
+
             int lightSize = 600;
             RenderTexture2D lightMask = Raylib.LoadRenderTexture(lightSize, lightSize);
 
@@ -348,6 +363,11 @@ namespace RaylibTest
 
                 float deltaTime = Raylib.GetFrameTime();
 
+                if (Raylib.IsKeyPressed(KeyboardKey.P))
+                {
+                    isPlaying = !isPlaying;
+                }
+
                 if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
                 if (isInWater == true) waterTime -= deltaTime;
 
@@ -543,8 +563,12 @@ namespace RaylibTest
 
                 // --- 4. PHYSIQUE ET COLLISIONS X ---
                 float moveX = currentSpeedX * deltaTime;
-                playerpos.X += moveX;
-                player.X = playerpos.X;
+
+                if (isPlaying)
+                {
+                    playerpos.X += moveX;
+                    player.X = playerpos.X;
+                }
 
                 if (!slimeWLeverActivated) // On ne teste la collision que si la barrière est fermée
                 {
@@ -603,7 +627,7 @@ namespace RaylibTest
                 Rectangle rightSensor = new Rectangle(player.X + player.Width, player.Y + 4, 2, player.Height - 8);
 
                 //outils de debug
-                if (Raylib.IsKeyPressed(KeyboardKey.P) && isPlaying)
+                if (Raylib.IsKeyPressed(KeyboardKey.Enter) && isPlaying)
                 {
                     canWallJump = true;
                     canSwim = true;
@@ -669,6 +693,10 @@ namespace RaylibTest
                         downspeed = maxWallSlideSpeed;
                     }
                 }
+                if (Raylib.IsKeyPressed(KeyboardKey.K))
+                {
+                    isPlaying = true;
+                }
 
                 // La physique de l'eau
                 // --- PHYSIQUE DE L'EAU ET NAGE ---
@@ -727,10 +755,11 @@ namespace RaylibTest
                 }
 
                 float moveY = (float)downspeed * deltaTime;
-
-                playerpos.Y += moveY;
-                player.Y = playerpos.Y;
-
+                if (isPlaying)
+                {
+                    playerpos.Y += moveY;
+                    player.Y = playerpos.Y;
+                }
                 if (!slimeWLeverActivated)
                 {
                     if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
@@ -1030,7 +1059,7 @@ namespace RaylibTest
 
 
                 // --- 8. RENDU / DESSIN ---
-                Raylib.BeginDrawing();
+                Raylib.BeginTextureMode(gameTarget);
                 Raylib.ClearBackground(Color.SkyBlue);
                 Raylib.BeginMode2D(camera);
 
@@ -1159,8 +1188,6 @@ namespace RaylibTest
                 // --- RENDU DU DIALOGUE (FIXE À L'ÉCRAN) ---
                 if (isInDialogue)
                 {
-                    int screenWidth = Raylib.GetScreenWidth();
-                    int screenHeight = Raylib.GetScreenHeight();
 
                     // Dimensions de la boîte de dialogue
                     int boxWidth = screenWidth - 100;
@@ -1179,12 +1206,59 @@ namespace RaylibTest
                     Raylib.DrawText("[E] ou [Espace] pour continuer", boxX + boxWidth - 300, boxY + boxHeight - 30, 16, Color.Gray);
                 }
 
+                Raylib.EndTextureMode();
+                Raylib.BeginDrawing();
+                Raylib.ClearBackground(Color.Black);
+
+                // Rectangle source de la RenderTarget (Attention : Y est inversé dans Raylib pour les RenderTexture!)
+                Rectangle screenSrcRec = new Rectangle(0, 0, gameTarget.Texture.Width, -gameTarget.Texture.Height);
+                Rectangle screenDestRec = new Rectangle(0, 0, screenWidth, screenHeight);
+
+                // Si le jeu est en pause, on active le shader de flou
+                if (!isPlaying)
+                {
+                    Raylib.BeginShaderMode(blurShader);
+                }
+
+                // On dessine l'image du jeu capturée sur tout l'écran
+                Raylib.DrawTexturePro(gameTarget.Texture, screenSrcRec, screenDestRec, Vector2.Zero, 0.0f, Color.White);
+
+                if (!isPlaying)
+                {
+                    Raylib.EndShaderMode();
+
+                    // Assombrir légèrement l'écran par-dessus le flou
+                    Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, Raylib.Fade(Color.Black, 0.3f));
+
+                    // DESSINER LE MENU PAUSE / START PAR-DESSUS LE FLOU
+                    string pauseText = "PAUSE";
+                    int fontSize = 60;
+                    int textWidth = Raylib.MeasureText(pauseText, fontSize);
+                    Raylib.DrawText(pauseText, screenWidth / 2 - textWidth / 2, screenHeight / 2 - 30, fontSize, Color.White);
+                    Raylib.DrawText("Appuyez sur [P] pour reprendre", screenWidth / 2 - 150, screenHeight / 2 + 50, 20, Color.LightGray);
+                }
+
+                // --- UI HORS PAUSE (ex: Boîte de dialogue) ---
+                if (isInDialogue)
+                {
+                    int boxWidth = screenWidth - 100;
+                    int boxHeight = 150;
+                    int boxX = 50;
+                    int boxY = screenHeight - boxHeight - 50;
+
+                    Raylib.DrawRectangle(boxX, boxY, boxWidth, boxHeight, Raylib.Fade(Color.Black, 0.85f));
+                    Raylib.DrawRectangleLines(boxX, boxY, boxWidth, boxHeight, Color.White);
+                    Raylib.DrawText(currentTalkingSlime.dialogue[dialogueStep], boxX + 30, boxY + 40, 24, Color.White);
+                }
+
                 Raylib.EndDrawing();
             }
 
             Raylib.CloseWindow();
             Raylib.UnloadTexture(knightSprite);
             Raylib.UnloadRenderTexture(lightMask);
+            Raylib.UnloadRenderTexture(gameTarget);
+            Raylib.UnloadShader(blurShader);
         }
     }
 }
