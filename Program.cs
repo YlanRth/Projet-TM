@@ -39,10 +39,17 @@ namespace RaylibTest
 
         public Rectangle Hitbox;
         public bool isVoid = false;
+        public string type = "spike"; // "spike", "void", "movingObject"
+        // Propriétés de déplacement (ex: gauche/droite)
+        public Vector2 Speed;
+        public float LeftBound;
+        public float RightBound;
+        public int Direction = 1; // 1 = Droite, -1 = Gauche
 
     }
     internal class Program
     {
+
         static void Main(string[] args)
         {
             bool devMode = false;
@@ -51,7 +58,7 @@ namespace RaylibTest
 
             Raylib.InitWindow(0, 0, "Slime Thing");
             Raylib.SetTargetFPS(60);
-            Vector2 playerpos = new Vector2(325, 300);
+            Vector2 playerpos = new Vector2(8000, 3000); //debut:(325, 300)
             Vector2 lastSafePosition = playerpos;
             float cameraSmoothing = 5.0f;
 
@@ -77,7 +84,7 @@ namespace RaylibTest
             // 1. On nettoie la texture en la rendant totalement transparente
             Raylib.ClearBackground(Color.Blank);
 
-            // 2. On dessine un cercle)
+            // 2. On dessine un cercle
             Raylib.BeginBlendMode(BlendMode.Alpha);
             Raylib.DrawCircleGradient(
                 lightSize / 2,
@@ -88,7 +95,7 @@ namespace RaylibTest
             );
             Raylib.EndBlendMode();
             Raylib.EndTextureMode();
-            bool isPlaying = false;
+            bool isPlaying = true;
             bool isGrounded = false;
             float gravity = 900;
             float downspeed = 0;
@@ -140,18 +147,26 @@ namespace RaylibTest
             //initialisation des dialogues et des slimes
             List<string> walljumpDialogue = new List<string>
             {
-                "Slime: Merci de m'avoir liberé ! Ces monstres m'ont enfermé dans cette prison de glace, je ne pouvais rien faire sans geler.",
-                "Slime: Laisse-moi t'aider. Je ne peux pas te laisser te battre seul contre cet ennemi commun.",
-                "Slime: Tu es le dernier espoir d'un monde sans tyrannie...",
-                "Systeme: Walljump debloqué !"
+                "Slime : Merci de m'avoir liberé ! Ces monstres m'ont enfermé dans cette prison de glace, je ne pouvais rien faire sans geler.",
+                "Slime : Laisse-moi t'aider. Je ne peux pas te laisser te battre seul contre cet ennemi commun.",
+                "Slime : Tu es le dernier espoir d'un monde sans tyrannie...",
+                "Systeme : Walljump debloqué !"
             };
 
             List<string> AirDialogue = new List<string>
             {
-                "Slime: Halte humain, ne t'approche pas.",
-                "Joueur: Je ne vous veux aucun mal, regardez j'ai déjà un de vos semblables comme ami.",
-                "Slime: Serais-tu le héros de la légende ? Celui qui unira les peuples ?",
-                "Systeme: Nage debloquée !"
+                "Slime : Halte humain, ne t'approche pas.",
+                "Joueur : Je ne vous veux aucun mal, regardez j'ai déjà un de vos semblables comme ami.",
+                "Slime : Serais-tu le héros de la légende ? Celui qui unira les peuples ?",
+                "Systeme : Nage debloquée !"
+            };
+
+            List<string> FireDialogue = new List<string>
+            {
+                "Slime : Bonjour humain, nous t'attendions.",
+                "Slime : Nous avons besoin de ton aide, ces monstres ont  étouffé la Flamme Mère.",
+                "Slime : Depuis ce jour, nous autres slimes de feu avons perdu notre force et sommes voués à l'extinction.",
+                "Slime : Si tu arrives à la raviver nous pourrons t'aider.",
             };
 
 
@@ -168,6 +183,12 @@ namespace RaylibTest
             slimeA.Color = new Color(255, 255, 255, 100);
             slimes.Add(slimeA);
 
+            Slime slimeF = new Slime();
+            slimeF.dialogue = FireDialogue; // On associe la liste directement
+            slimeF.body = new Rectangle(7900, 3400, 100, 100);
+            slimeF.Color = new Color(11, 11, 12, 255);
+            slimes.Add(slimeF);
+
             // Liste de toutes les plateformes
             List<Rectangle> platforms = new List<Rectangle>
             {
@@ -177,7 +198,7 @@ namespace RaylibTest
                 new Rectangle(1000,250,400,250),
                 new Rectangle(1600,250,400,250),
                 new Rectangle(2000,475,1200,25),
-                new Rectangle(3200,250,2000,250),
+                new Rectangle(3200,250,3000,250),
                 new Rectangle(1750,50,200,25),
                 new Rectangle(450,-300,1325,200),
                 new Rectangle(1925,-300,1675,200),
@@ -208,6 +229,17 @@ namespace RaylibTest
                 new Rectangle(1650,-2800,1275,500),
                 new Rectangle(2925,-1550,2275,1250),
                 new Rectangle(650,-3000,1000,1025),
+                new Rectangle(5200,-1000,2000,1050),
+                new Rectangle(5700,500,500,3000),
+                new Rectangle(6700,50,500,3000),
+                new Rectangle(5700,3500,2800,500),//Lava zone entrance
+                new Rectangle(8000,4000,500,1500),
+                new Rectangle(8700,2900,1000,1125),
+                new Rectangle(8450,3250,100,25),
+                new Rectangle(8450,3000,100,25),
+                new Rectangle(9800,2900,200,25),
+                new Rectangle(10000,2900,1000,1125),
+                new Rectangle(5700,6775,10000,1125)
             };
 
             List<Rectangle> noWalljumpPlatforms = new List<Rectangle>
@@ -293,7 +325,32 @@ namespace RaylibTest
             {
                 new Death{
                     Hitbox= new Rectangle(0,1500,1450,100),
-                    isVoid=true
+                    type = "void"
+                    },
+
+                new Death{
+                    Hitbox= new Rectangle(8000,3800,500,100),
+                    type = "movingObject",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(100,0)
+
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9700,3150,200,50),
+                    type = "spike"
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9800,3425,200,50),
+                    type = "spike"
+                    },
+                    new Death{
+                    Hitbox= new Rectangle(9700,3700,200,50),
+                    type = "spike"
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9800,3975,200,50),
+                    type = "spike"
                     },
             };
 
@@ -312,9 +369,8 @@ namespace RaylibTest
 
             // Chargement du sprite
             string executionPath = AppDomain.CurrentDomain.BaseDirectory;
-            string imagePath = Path.Combine(executionPath, "Sprites", "Hero-walk-Sheet.png");
 
-            Texture2D knightSprite = Raylib.LoadTexture(imagePath);
+            Texture2D knightSprite = Raylib.LoadTexture("Sprites/Hero-walk-Sheet.png");
             Raylib.SetTextureFilter(knightSprite, TextureFilter.Point);
 
             int totalFrames = 6;
@@ -632,7 +688,7 @@ namespace RaylibTest
                     canWallJump = true;
                     canSwim = true;
                     canDoubleJumpAndDash = true;
-                    devMode = true;
+                    devMode = !devMode;
                 }
                 if (devMode)
                 {
@@ -960,8 +1016,25 @@ namespace RaylibTest
                         }
                     }
                 }
+                foreach (var death in deathZone)
+                {
+                    if (death.type == "movingObject")
+                    {
+                        // Déplacement Aller-Retour
+                        death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
 
-
+                        if (death.Hitbox.X >= death.RightBound)
+                        {
+                            death.Hitbox.X = death.RightBound;
+                            death.Direction = -1;
+                        }
+                        else if (death.Hitbox.X <= death.LeftBound)
+                        {
+                            death.Hitbox.X = death.LeftBound;
+                            death.Direction = 1;
+                        }
+                    }
+                }
                 // --- INTERACTION LEVIER ---
                 Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
                 Vector2 leverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
@@ -983,13 +1056,25 @@ namespace RaylibTest
 
                 if (Vector2.Distance(playerCenter, slimeACenter) < 200 && !slimeA.isAllied && playerpos.Y <= -1800)
                 {
-                    // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
                     if (!isInDialogue)
                     {
                         isInDialogue = true;
                         dialogueStep = 0;
                         currentSpeedX = 0; // On stoppe net le joueur
                         currentTalkingSlime = slimeA;
+                    }
+                }
+
+                Vector2 slimeFCenter = new Vector2(slimeF.body.X + slimeF.body.Width / 2, slimeF.body.Y + slimeF.body.Height / 2);
+
+                if (Vector2.Distance(playerCenter, slimeFCenter) < 200 && !slimeA.isAllied)
+                {
+                    if (!isInDialogue && Raylib.IsKeyPressed(KeyboardKey.E))
+                    {
+                        isInDialogue = true;
+                        dialogueStep = 0;
+                        currentSpeedX = 0; // On stoppe net le joueur
+                        currentTalkingSlime = slimeF;
                     }
                 }
 
@@ -1015,7 +1100,10 @@ namespace RaylibTest
                                 canSwim = true;
                             }
                             // Passer le bon slime en allié
-                            currentTalkingSlime.isAllied = true;
+                            if (currentTalkingSlime != slimeF)
+                            {
+                                currentTalkingSlime.isAllied = true;
+                            }
                             // Réinitialiser la référence
                             currentTalkingSlime = null;
                         }
@@ -1090,17 +1178,6 @@ namespace RaylibTest
                     spriteRenderHeight
                 );
 
-                Vector2 origin = new Vector2(0, 0);
-
-                Raylib.DrawTexturePro(
-                    knightSprite,
-                    sourceRec,
-                    destRec,
-                    origin,
-                    0.0f,
-                    Color.White
-                );
-
                 foreach (var wat in water)
                 {
                     Raylib.DrawRectangleRec(wat, Raylib.Fade(Color.Blue, 0.4f));
@@ -1149,16 +1226,31 @@ namespace RaylibTest
                     }
                 }
 
+                Vector2 origin = new Vector2(0, 0);
+
+                Raylib.DrawTexturePro(
+                    knightSprite,
+                    sourceRec,
+                    destRec,
+                    origin,
+                    0.0f,
+                    Color.White
+                );
+
                 Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
                 foreach (var death in deathZone)
                 {
-                    if (death.isVoid)
+                    if (death.type == "void")
                     {
                         Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
                     }
-                    else
+                    else if (death.type == "spike")
                     {
-                        Raylib.DrawRectangleRec(death.Hitbox, new Color(240, 240, 240, 255));
+                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                    }
+                    else if (death.type == "movingObject")
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
                     }
                 }
                 if (!devMode)
@@ -1182,6 +1274,10 @@ namespace RaylibTest
                     // 2. Remplir le reste de la carte autour du carré de lumière
                     Raylib.DrawRing(new Vector2(playerpos.X + player.Width / 2, playerpos.Y + player.Height / 2), lightSize / 2 - 2, 5000f, 0, 360, 60, new Color(0, 0, 0, 255));
 
+                }
+                else
+                {
+                    Raylib.DrawText($"Player Pos: {playerpos.X}, {playerpos.Y}", (int)playerpos.X - (int)50, (int)playerpos.Y - (int)50, 20, Color.Black);
                 }
                 Raylib.EndMode2D();
 
