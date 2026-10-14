@@ -9,6 +9,7 @@ using System.Numerics;
 using Rectangle = Raylib_cs.Rectangle;
 using Color = Raylib_cs.Color;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace RaylibTest
 {
@@ -39,12 +40,15 @@ namespace RaylibTest
 
         public Rectangle Hitbox;
         public bool isVoid = false;
-        public string type = "spike"; // "spike", "void", "movingObject"
+        public string type = "spike"; // "spike", "void", "movingObjectL/R", "movingObjectU/D"
         // Propriétés de déplacement (ex: gauche/droite)
         public Vector2 Speed;
         public float LeftBound;
         public float RightBound;
+        public float UpBound;
+        public float DownBound;
         public int Direction = 1; // 1 = Droite, -1 = Gauche
+        public Vector2 respawnLocation;
 
     }
     internal class Program
@@ -161,7 +165,7 @@ namespace RaylibTest
                 "Systeme : Nage debloquée !"
             };
 
-            List<string> FireDialogue = new List<string>
+            List<string> FireDialogue1 = new List<string>
             {
                 "Slime : Bonjour humain, nous t'attendions.",
                 "Slime : Nous avons besoin de ton aide, ces monstres ont  étouffé la Flamme Mère.",
@@ -184,7 +188,7 @@ namespace RaylibTest
             slimes.Add(slimeA);
 
             Slime slimeF = new Slime();
-            slimeF.dialogue = FireDialogue; // On associe la liste directement
+            slimeF.dialogue = FireDialogue1; // On associe la liste directement
             slimeF.body = new Rectangle(7900, 3400, 100, 100);
             slimeF.Color = new Color(11, 11, 12, 255);
             slimes.Add(slimeF);
@@ -232,24 +236,41 @@ namespace RaylibTest
                 new Rectangle(5200,-1000,2000,1050),
                 new Rectangle(5700,500,500,3000),
                 new Rectangle(6700,50,500,3000),
-                new Rectangle(5700,3500,2800,500),//Lava zone entrance
-                new Rectangle(8000,4000,500,1500),
-                new Rectangle(8700,2900,1000,1125),
+                new Rectangle(5700,3500,2800,850),//Lava zone entrance
+                new Rectangle(10940,4000,500,1525),
+                new Rectangle(8700,2900,1000,2425),
                 new Rectangle(8450,3250,100,25),
                 new Rectangle(8450,3000,100,25),
                 new Rectangle(9800,2900,200,25),
                 new Rectangle(10000,2900,1000,1125),
-                new Rectangle(5700,6775,10000,1125)
+                new Rectangle(8700,5525,7000,1125),
+                new Rectangle(5000,5525,2125,1125),
+                new Rectangle(7000,4625,200,700),
+                new Rectangle(7125,6000,1575,1000),
+                new Rectangle(6900,4725,100,600),
+                new Rectangle(6800,4825,100,500),
+                new Rectangle(6700,4925,100,400),
+                new Rectangle(6600,5025,100,300),
+                new Rectangle(6500,5125,100,200),
+                new Rectangle(6400,5225,100,100),
+                new Rectangle(5600,4000,500,1525),
+                new Rectangle(6300,5300,100,25),
+
             };
 
             List<Rectangle> noWalljumpPlatforms = new List<Rectangle>
             {
                 new Rectangle(0,-400,100, 800),
+                new Rectangle(7400,4625,100,700),
+                new Rectangle(7700,4625,100,700),
+                new Rectangle(8000,4625,100,700),
+                new Rectangle(8300,4625,400,700)
             };
 
             List<Rectangle> water = new List<Rectangle>
             {
-                new Rectangle(2000,260,1200,215)
+                new Rectangle(2000,260,1200,215),
+                new Rectangle(7125,5535,1575,465)
             };
 
             List<Rectangle> ice = new List<Rectangle>
@@ -274,7 +295,7 @@ namespace RaylibTest
                 new Rectangle(900,-1100,25,100),
                 new Rectangle(925,-1100,500,25),
                 new Rectangle(1925,-1550,1000,1250),
-                new Rectangle(3600,-300,1400,12)
+                new Rectangle(3600,-300,1400,12),
             };
 
             List<Stalactite> stalactites = new List<Stalactite>
@@ -325,32 +346,248 @@ namespace RaylibTest
             {
                 new Death{
                     Hitbox= new Rectangle(0,1500,1450,100),
-                    type = "void"
-                    },
-
-                new Death{
-                    Hitbox= new Rectangle(8000,3800,500,100),
-                    type = "movingObject",
-                    LeftBound=8000,
-                    RightBound=8500,
-                    Speed=new Vector2(100,0)
-
+                    type = "void",
+                    respawnLocation= new Vector2(1125,691)
                     },
                 new Death{
                     Hitbox= new Rectangle(9700,3150,200,50),
-                    type = "spike"
+                    type = "spike",
+                    respawnLocation= new Vector2(9880,2816)
                     },
                 new Death{
                     Hitbox= new Rectangle(9800,3425,200,50),
-                    type = "spike"
+                    type = "spike",
+                    respawnLocation= new Vector2(9880,2816)
                     },
                     new Death{
                     Hitbox= new Rectangle(9700,3700,200,50),
-                    type = "spike"
+                    type = "spike",
+                    respawnLocation= new Vector2(9880,2816)
                     },
                 new Death{
                     Hitbox= new Rectangle(9800,3975,200,50),
-                    type = "spike"
+                    type = "spike",
+                    respawnLocation= new Vector2(9880,2816)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8500,5325,100,1000),
+                    type = "movingObjectU/D",
+                    UpBound=5325,
+                    DownBound=5745,
+                    Speed=new Vector2(0,200),
+                    respawnLocation= new Vector2(8700,5441)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8100,5745,300,1000),
+                    type = "movingObjectU/D",
+                    UpBound=5325,
+                    DownBound=5745,
+                    Speed=new Vector2(0,200),
+                    respawnLocation= new Vector2(8700,5441)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(7975,5325,100,1000),
+                    type = "movingObjectU/D",
+                    UpBound=5325,
+                    DownBound=5745,
+                    Speed=new Vector2(0,200),
+                    respawnLocation= new Vector2(8700,5441)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(7850,5745,100,1000),
+                    type = "movingObjectU/D",
+                    UpBound=5325,
+                    DownBound=5745,
+                    Speed=new Vector2(0,200),
+                    respawnLocation= new Vector2(8700,5441)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(7225,5745,525,1000),
+                    type = "movingObjectU/D",
+                    UpBound=5325,
+                    DownBound=5745,
+                    Speed=new Vector2(0,130),
+                    respawnLocation= new Vector2(8700,5441)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6400,5125,500,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6400,
+                    RightBound=6600,
+                    Speed=new Vector2(75,0),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6700,5025,500,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6500,
+                    RightBound=6700,
+                    Speed=new Vector2(75),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6800,4925,400,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6600,
+                    RightBound=6800,
+                    Speed=new Vector2(75,0),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6700,4825,300,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6700,
+                    RightBound=6900,
+                    Speed=new Vector2(75,0),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6800,4725,200,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6800,
+                    RightBound=7000,
+                    Speed=new Vector2(75,0),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(6900,4625,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=6900,
+                    RightBound=7100,
+                    Speed=new Vector2(75,0),
+                    respawnLocation=new Vector2(6330,5216)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(7400,4350,100,275),
+                    type = "movingObjectU/D",
+                    UpBound=4075,
+                    DownBound=4350,
+                    Speed=new Vector2(0,100),
+                    respawnLocation= new Vector2(7080,4541)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(7700,4075,100,275),
+                    type = "movingObjectU/D",
+                    UpBound=4075,
+                    DownBound=4350,
+                    Speed=new Vector2(0,100),
+                    respawnLocation= new Vector2(7080,4541)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8000,4350,100,275),
+                    type = "movingObjectU/D",
+                    UpBound=4075,
+                    DownBound=4350,
+                    Speed=new Vector2(0,100),
+                    respawnLocation= new Vector2(7080,4541)
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8000,4250,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9100,4250,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8025,4150,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9075,4150,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8050,4050,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9050,4050,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8075,3950,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9025,3950,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8100,3850,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(9000,3850,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8125,3750,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8000,
+                    RightBound=8500,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=-1
+                    },
+                new Death{
+                    Hitbox= new Rectangle(8975,3750,100,100),
+                    type = "movingObjectL/R",
+                    LeftBound=8600,
+                    RightBound=9100,
+                    Speed=new Vector2(190,0),
+                    respawnLocation= new Vector2(8580,4541),
+                    Direction=1
                     },
             };
 
@@ -364,6 +601,10 @@ namespace RaylibTest
             Rectangle slimeWBarrier = new Rectangle(3625, 675, 25, 200);
             bool slimeWLeverActivated = false; // Le levier commence "non activé"
             Rectangle slimeWLeverTrigger = new Rectangle(3675, 905, 40, 40);
+
+            bool MotherFlameLeverActivated = false; // Le levier commence "non activé"
+            Rectangle MotherFlameLeverTrigger = new Rectangle(10900, 5485, 40, 40);
+            Rectangle MotherFlameBarrier = new Rectangle(8500, 3500, 200, 25);
 
 
 
@@ -386,6 +627,7 @@ namespace RaylibTest
             // On définit la taille de la boîte de collision rouge (le corps)
             float hitboxWidth = 10 * frameScale;
             float hitboxHeight = 21 * frameScale;
+
 
             // Taille réelle que doit faire le sprite entier à l'écran
             float spriteRenderWidth = frameWidth * frameScale;
@@ -637,6 +879,17 @@ namespace RaylibTest
                     }
                 }
 
+                if (!MotherFlameLeverActivated) // On ne teste la collision que si la barrière est fermée
+                {
+                    if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
+                    {
+                        if (moveX > 0) playerpos.X = MotherFlameBarrier.X - player.Width;
+                        else if (moveX < 0) playerpos.X = MotherFlameBarrier.X + MotherFlameBarrier.Width;
+                        player.X = playerpos.X;
+                        currentSpeedX = 0;
+                    }
+                }
+
                 foreach (var plat in platforms)
                 {
                     if (Raylib.CheckCollisionRecs(player, plat))
@@ -835,6 +1088,25 @@ namespace RaylibTest
                     }
                 }
 
+                if (!MotherFlameLeverActivated)
+                {
+                    if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
+                    {
+                        if (downspeed > 0)
+                        {
+                            playerpos.Y = MotherFlameBarrier.Y - player.Height;
+                            downspeed = 0;
+                            isGrounded = true;
+                        }
+                        else if (downspeed < 0)
+                        {
+                            playerpos.Y = MotherFlameBarrier.Y + MotherFlameBarrier.Height;
+                            downspeed = 0;
+                        }
+                        player.Y = playerpos.Y;
+                    }
+                }
+
                 foreach (var plat in platforms)
                 {
                     if (Raylib.CheckCollisionRecs(player, plat))
@@ -1018,7 +1290,7 @@ namespace RaylibTest
                 }
                 foreach (var death in deathZone)
                 {
-                    if (death.type == "movingObject")
+                    if (death.type == "movingObjectL/R")
                     {
                         // Déplacement Aller-Retour
                         death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
@@ -1034,12 +1306,29 @@ namespace RaylibTest
                             death.Direction = 1;
                         }
                     }
+                    else if (death.type == "movingObjectU/D")
+                    {
+                        // Déplacement Aller-Retour
+                        death.Hitbox.Y += death.Speed.Y * death.Direction * deltaTime;
+
+                        if (death.Hitbox.Y >= death.DownBound)
+                        {
+                            death.Hitbox.Y = death.DownBound;
+                            death.Direction = -1;
+                        }
+                        else if (death.Hitbox.Y <= death.UpBound)
+                        {
+                            death.Hitbox.Y = death.UpBound;
+                            death.Direction = 1;
+                        }
+                    }
                 }
                 // --- INTERACTION LEVIER ---
                 Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
-                Vector2 leverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
+                Vector2 slimeWLeverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
+                Vector2 MotherFLameLeverCenter = new Vector2(MotherFlameLeverTrigger.X + MotherFlameLeverTrigger.Width / 2, MotherFlameLeverTrigger.Y + MotherFlameLeverTrigger.Height / 2);
 
-                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slimeWLeverActivated)
+                if (Vector2.Distance(playerCenter, slimeWLeverCenter) < interactionRadius && !slimeWLeverActivated)
                 {
                     // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
                     if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue && isPlaying)
@@ -1049,6 +1338,23 @@ namespace RaylibTest
                         currentSpeedX = 0; // On stoppe net le joueur
                         slimeWLeverActivated = true;    // La barrière s'ouvre !
                         currentTalkingSlime = slimeW;
+                    }
+                }
+
+                if (Vector2.Distance(playerCenter, MotherFLameLeverCenter) < interactionRadius && !MotherFlameLeverActivated)
+                {
+                    // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
+                    if (Raylib.IsKeyPressed(KeyboardKey.E) && isPlaying)
+                    {
+                        MotherFlameLeverActivated = true;
+                        slimes[2].Color = new Color(184, 24, 6);
+                        List<string> FireDialogue2 = new List<string>
+                        {
+                        "Slime : Merci, tu as reussi à nous sauver.",
+                        "Slime : En guise de remerciement, je vais reforger ton épée avec la force de la Flamme Mère.",
+                        "Slime : Avec ça tu pourras battre les orcs."
+                        };
+                        slimes[2].dialogue = FireDialogue2;
                     }
                 }
 
@@ -1072,7 +1378,7 @@ namespace RaylibTest
                     if (!isInDialogue && Raylib.IsKeyPressed(KeyboardKey.E))
                     {
                         isInDialogue = true;
-                        dialogueStep = 0;
+                        dialogueStep = -1;
                         currentSpeedX = 0; // On stoppe net le joueur
                         currentTalkingSlime = slimeF;
                     }
@@ -1114,10 +1420,10 @@ namespace RaylibTest
                 {
                     if (Raylib.CheckCollisionRecs(player, death.Hitbox))
                     {
-                        // Téléportation au dernier sol stable
-                        playerpos = lastSafePosition;
-                        player.X = playerpos.X;
-                        player.Y = playerpos.Y;
+
+                        playerpos = death.respawnLocation;
+                        player.X = death.respawnLocation.X;
+                        player.Y = death.respawnLocation.Y;
 
                         // On coupe net les vitesses pour éviter qu'il garde son élan de chute
                         downspeed = 0;
@@ -1143,13 +1449,25 @@ namespace RaylibTest
                     waterTime = 5;
                 }
 
-
-
-
                 // --- 8. RENDU / DESSIN ---
                 Raylib.BeginTextureMode(gameTarget);
                 Raylib.ClearBackground(Color.SkyBlue);
                 Raylib.BeginMode2D(camera);
+                foreach (var death in deathZone)
+                {
+                    if (death.type == "void")
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
+                    }
+                    else if (death.type == "spike")
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                    }
+                    else if (death.type == "movingObjectL/R" || death.type == "movingObjectU/D")
+                    {
+                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                    }
+                }
 
                 foreach (var plat in platforms)
                 {
@@ -1202,19 +1520,20 @@ namespace RaylibTest
                 }
 
                 // Dessiner le levier (Rouge = Fermé, Vert = Ouvert)
-                Color leverColor = slimeWLeverActivated ? Color.Green : Color.Red;
-                Raylib.DrawRectangleRec(slimeWLeverTrigger, leverColor);
+                Color slimeWLeverColor = slimeWLeverActivated ? Color.Green : Color.Red;
+                Raylib.DrawRectangleRec(slimeWLeverTrigger, slimeWLeverColor);
 
-                // Afficher un petit texte d'indication si le joueur est proche
-                if (Vector2.Distance(playerCenter, leverCenter) < interactionRadius && !slimeWLeverActivated)
-                {
-                    Raylib.DrawText("Appuyez sur E", (int)slimeWLeverTrigger.X - 20, (int)slimeWLeverTrigger.Y - 20, 10, Color.White);
-                }
+                Color MotherFlameLeverColor = MotherFlameLeverActivated ? Color.Green : Color.Red;
+                Raylib.DrawRectangleRec(MotherFlameLeverTrigger, MotherFlameLeverColor);
 
                 // Dessiner la barrière seulement si elle est fermée
                 if (!slimeWLeverActivated)
                 {
                     Raylib.DrawRectangleRec(slimeWBarrier, Raylib.Fade(Color.Gray, 0.8f));
+                }
+                if (!MotherFlameLeverActivated)
+                {
+                    Raylib.DrawRectangleRec(MotherFlameBarrier, Raylib.Fade(Color.Gray, 0.8f));
                 }
 
                 foreach (var slime in slimes)
@@ -1238,21 +1557,7 @@ namespace RaylibTest
                 );
 
                 Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
-                foreach (var death in deathZone)
-                {
-                    if (death.type == "void")
-                    {
-                        Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
-                    }
-                    else if (death.type == "spike")
-                    {
-                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
-                    }
-                    else if (death.type == "movingObject")
-                    {
-                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
-                    }
-                }
+
                 if (!devMode)
                 {
                     // --- DESSINER L'OMBRE AUTOUR DU JOUEUR ---
