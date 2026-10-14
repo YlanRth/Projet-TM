@@ -130,20 +130,6 @@ namespace RaylibTest
             float waterTime = 5f;
             bool isInWater = false;
 
-            bool canDoubleJumpAndDash = false;
-            int doubleJumpCounter = 0;
-
-            bool canDash = true;                   // Est-ce-Que le dash a reset (retour au sol ou contre un mur)
-            bool isDashing = false;         // Est-on en train de dasher MAINTENANT ?
-
-            float dashSpeed = 600f;        // Vitesse pendant le dash (très rapide)
-            float dashDuration = 0.3f;     // Durée du dash en secondes
-            float dashTimer = 0f;           // Timer interne pour la durée restante
-
-            float dashCooldown = 0.6f;      // Temps d'attente entre 2 dashs
-            float dashCooldownTimer = 0f;   // Timer de cooldown
-
-
             List<Slime> slimes = new List<Slime>
             {
 
@@ -614,7 +600,7 @@ namespace RaylibTest
 
             Texture2D knightSpriteBase = Raylib.LoadTexture("Sprites/Hero-base-walk-Sheet.png");
             Texture2D knightSpriteRepaired = Raylib.LoadTexture("Sprites/Hero-repaired-walk-Sheet.png");
-            
+
             Raylib.SetTextureFilter(knightSpriteBase, TextureFilter.Point);
             Raylib.SetTextureFilter(knightSpriteRepaired, TextureFilter.Point);
 
@@ -674,27 +660,6 @@ namespace RaylibTest
 
                 if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
                 if (isInWater == true) waterTime -= deltaTime;
-
-                if (canDoubleJumpAndDash && (isGrounded || isTouchingWallLeft || isTouchingWallRight))
-                {
-                    doubleJumpCounter = 1;
-                }
-
-                // Rechargement quand on touche le sol ou un mur
-                if (isGrounded || isTouchingWallLeft || isTouchingWallRight || isInWater)
-                {
-                    if (dashCooldownTimer <= 0)
-                    {
-                        canDash = true;
-                    }
-                }
-
-                // Mise à jour du timer de cooldown
-                if (dashCooldownTimer > 0)
-                {
-                    dashCooldownTimer -= deltaTime;
-                }
-
 
                 if (currentSpeedX != 0)
                 {
@@ -769,47 +734,6 @@ namespace RaylibTest
 
 
                 // --- 3. DÉPLACEMENT HORIZONTAL (ENTRÉES + FRICTION) ---
-                // --- DÉCLENCHEMENT DU DASH ---
-                if (Raylib.IsKeyPressed(KeyboardKey.LeftShift) && canDash && !isInDialogue && canDoubleJumpAndDash && isPlaying)
-                {
-                    isDashing = true;
-                    canDash = false;
-                    dashTimer = dashDuration;
-                    dashCooldownTimer = dashCooldown;
-
-                }
-
-                // --- ÉTAT PENDANT LE DASH ---
-                if (isDashing)
-                {
-                    dashTimer -= deltaTime;
-
-                    // 1. Vitesse horizontale constante et élevée
-                    currentSpeedX = flipX * dashSpeed;
-
-                    // 2. Annule complètement la gravité pendant le dash
-                    downspeed = 0;
-
-                    // Fin du dash
-                    if (dashTimer <= 0)
-                    {
-                        isDashing = false;
-                        if (isOnIce)
-                        {
-                            currentSpeedX = 400f;
-                        }
-                        else if (isInWater)
-                        {
-                            currentSpeedX = 150f;
-                        }
-                        else
-                        {
-                            currentSpeedX = 250f;
-                        }
-                    }
-                }
-
-
                 bool inputPressed = false;
                 if (!isInDialogue && wallJumpLockTimer <= 0f && isPlaying)
                 {
@@ -857,11 +781,9 @@ namespace RaylibTest
                 }
 
                 // Limitation de la vitesse max
-                if (!isDashing)
-                {
-                    if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
-                    if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
-                }
+                if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
+
                 // Forcer l'animation si le personnage glisse
                 if (MathF.Abs(currentSpeedX) > 10f) isMoving = true;
 
@@ -946,7 +868,6 @@ namespace RaylibTest
                 {
                     canWallJump = true;
                     canSwim = true;
-                    canDoubleJumpAndDash = true;
                     devMode = !devMode;
                 }
                 if (devMode)
@@ -1208,12 +1129,7 @@ namespace RaylibTest
                         coyoteTimeCounter = 0;
                         wallJumpLockTimer = 0.4f;
                     }
-                    else if (canDoubleJumpAndDash && doubleJumpCounter != 0 && !isGrounded)
-                    {
-                        downspeed = -450;
-                        doubleJumpCounter = 0;
-                        jumpBufferCounter = 0;
-                    }
+                    
                 }
 
                 if (Raylib.IsKeyReleased(KeyboardKey.Space) && downspeed < 0)
@@ -1560,8 +1476,9 @@ namespace RaylibTest
                 Vector2 origin = new Vector2(0, 0);
                 if (isSwordrepaired)
                 {
-                    currentSprite=knightSpriteRepaired;
-                };
+                    currentSprite = knightSpriteRepaired;
+                }
+                ;
                 Raylib.DrawTexturePro(
                     currentSprite,
                     sourceRec,
