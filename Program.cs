@@ -122,6 +122,7 @@ namespace RaylibTest
 
             bool canSwim = false;
             bool canWallJump = false;         // Bloque ou autorise le walljump
+            bool isSwordrepaired = false;
             bool isInDialogue = false;        // Met le jeu en "pause" pendant que le slime parle
             int dialogueStep = -1;            // Étape actuelle du dialogue
             Slime? currentTalkingSlime = null; // avec quel slime on parle  
@@ -611,16 +612,21 @@ namespace RaylibTest
             // Chargement du sprite
             string executionPath = AppDomain.CurrentDomain.BaseDirectory;
 
-            Texture2D knightSprite = Raylib.LoadTexture("Sprites/Hero-walk-Sheet.png");
-            Raylib.SetTextureFilter(knightSprite, TextureFilter.Point);
+            Texture2D knightSpriteBase = Raylib.LoadTexture("Sprites/Hero-base-walk-Sheet.png");
+            Texture2D knightSpriteRepaired = Raylib.LoadTexture("Sprites/Hero-repaired-walk-Sheet.png");
+            
+            Raylib.SetTextureFilter(knightSpriteBase, TextureFilter.Point);
+            Raylib.SetTextureFilter(knightSpriteRepaired, TextureFilter.Point);
+
+            Texture2D currentSprite = knightSpriteBase;
 
             int totalFrames = 6;
             int currentFrame = 0;
             float frameTimer = 0.0f;
             float frameSpeed = 0.1f;
 
-            int frameWidth = knightSprite.Width / totalFrames;
-            int frameHeight = knightSprite.Height;
+            int frameWidth = knightSpriteBase.Width / totalFrames;
+            int frameHeight = knightSpriteBase.Height;
             float frameScale = 4.0f;
 
             // --- REGLAGES DE LA HITBOX ---
@@ -1290,36 +1296,39 @@ namespace RaylibTest
                 }
                 foreach (var death in deathZone)
                 {
-                    if (death.type == "movingObjectL/R")
+                    if (MotherFlameLeverActivated)
                     {
-                        // Déplacement Aller-Retour
-                        death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
+                        if (death.type == "movingObjectL/R")
+                        {
+                            // Déplacement Aller-Retour
+                            death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
 
-                        if (death.Hitbox.X >= death.RightBound)
-                        {
-                            death.Hitbox.X = death.RightBound;
-                            death.Direction = -1;
+                            if (death.Hitbox.X >= death.RightBound)
+                            {
+                                death.Hitbox.X = death.RightBound;
+                                death.Direction = -1;
+                            }
+                            else if (death.Hitbox.X <= death.LeftBound)
+                            {
+                                death.Hitbox.X = death.LeftBound;
+                                death.Direction = 1;
+                            }
                         }
-                        else if (death.Hitbox.X <= death.LeftBound)
+                        else if (death.type == "movingObjectU/D")
                         {
-                            death.Hitbox.X = death.LeftBound;
-                            death.Direction = 1;
-                        }
-                    }
-                    else if (death.type == "movingObjectU/D")
-                    {
-                        // Déplacement Aller-Retour
-                        death.Hitbox.Y += death.Speed.Y * death.Direction * deltaTime;
+                            // Déplacement Aller-Retour
+                            death.Hitbox.Y += death.Speed.Y * death.Direction * deltaTime;
 
-                        if (death.Hitbox.Y >= death.DownBound)
-                        {
-                            death.Hitbox.Y = death.DownBound;
-                            death.Direction = -1;
-                        }
-                        else if (death.Hitbox.Y <= death.UpBound)
-                        {
-                            death.Hitbox.Y = death.UpBound;
-                            death.Direction = 1;
+                            if (death.Hitbox.Y >= death.DownBound)
+                            {
+                                death.Hitbox.Y = death.DownBound;
+                                death.Direction = -1;
+                            }
+                            else if (death.Hitbox.Y <= death.UpBound)
+                            {
+                                death.Hitbox.Y = death.UpBound;
+                                death.Direction = 1;
+                            }
                         }
                     }
                 }
@@ -1343,7 +1352,6 @@ namespace RaylibTest
 
                 if (Vector2.Distance(playerCenter, MotherFLameLeverCenter) < interactionRadius && !MotherFlameLeverActivated)
                 {
-                    // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
                     if (Raylib.IsKeyPressed(KeyboardKey.E) && isPlaying)
                     {
                         MotherFlameLeverActivated = true;
@@ -1404,6 +1412,10 @@ namespace RaylibTest
                             else if (currentTalkingSlime == slimeA)
                             {
                                 canSwim = true;
+                            }
+                            else if (currentTalkingSlime == slimeF)
+                            {
+                                isSwordrepaired = true;
                             }
                             // Passer le bon slime en allié
                             if (currentTalkingSlime != slimeF)
@@ -1546,9 +1558,12 @@ namespace RaylibTest
                 }
 
                 Vector2 origin = new Vector2(0, 0);
-
+                if (isSwordrepaired)
+                {
+                    currentSprite=knightSpriteRepaired;
+                };
                 Raylib.DrawTexturePro(
-                    knightSprite,
+                    currentSprite,
                     sourceRec,
                     destRec,
                     origin,
@@ -1656,7 +1671,8 @@ namespace RaylibTest
             }
 
             Raylib.CloseWindow();
-            Raylib.UnloadTexture(knightSprite);
+            Raylib.UnloadTexture(knightSpriteBase);
+            Raylib.UnloadTexture(knightSpriteRepaired);
             Raylib.UnloadRenderTexture(lightMask);
             Raylib.UnloadRenderTexture(gameTarget);
             Raylib.UnloadShader(blurShader);
