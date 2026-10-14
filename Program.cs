@@ -66,6 +66,8 @@ namespace RaylibTest
             Vector2 lastSafePosition = playerpos;
             float cameraSmoothing = 5.0f;
 
+            bool isGameEnded = false;
+
             // Obtenir la résolution dynamique de l'écran (puisque tu es en Fullscreen)
             int screenWidth = Raylib.GetScreenWidth();
             int screenHeight = Raylib.GetScreenHeight();
@@ -595,14 +597,31 @@ namespace RaylibTest
 
 
 
-            // Chargement du sprite
+            // Chargement des sprite
             string executionPath = AppDomain.CurrentDomain.BaseDirectory;
 
             Texture2D knightSpriteBase = Raylib.LoadTexture("Sprites/Hero-base-walk-Sheet.png");
             Texture2D knightSpriteRepaired = Raylib.LoadTexture("Sprites/Hero-repaired-walk-Sheet.png");
 
+            // Chargement des décors de fin
+            Texture2D bgEnd = Raylib.LoadTexture("Sprites/End_Bg.png");
+            Texture2D groundEnd = Raylib.LoadTexture("Sprites/End_Ground.png");
+
             Raylib.SetTextureFilter(knightSpriteBase, TextureFilter.Point);
             Raylib.SetTextureFilter(knightSpriteRepaired, TextureFilter.Point);
+            Raylib.SetTextureFilter(bgEnd, TextureFilter.Point);
+            Raylib.SetTextureFilter(groundEnd, TextureFilter.Point);
+
+            // Activer la répétition en boucle des textures
+            Raylib.SetTextureWrap(bgEnd, TextureWrap.Repeat);
+            Raylib.SetTextureWrap(groundEnd, TextureWrap.Repeat);
+
+            // Variables pour gérer le défilement
+            float bgScrollX = 0.0f;
+            float groundScrollX = 0.0f;
+
+            float bgSpeed = 30.0f;     // Les montagnes défilent doucement
+            float groundSpeed = 180.0f; // Le sol défile à la vitesse de marche
 
             Texture2D currentSprite = knightSpriteBase;
 
@@ -652,891 +671,975 @@ namespace RaylibTest
             {
 
                 float deltaTime = Raylib.GetFrameTime();
-
-                if (Raylib.IsKeyPressed(KeyboardKey.P))
+                if (!isGameEnded)
                 {
-                    isPlaying = !isPlaying;
-                }
 
-                if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
-                if (isInWater == true) waterTime -= deltaTime;
-
-                if (currentSpeedX != 0)
-                {
-                    flipX = currentSpeedX > 0 ? 1 : -1;
-                }
-
-                isGrounded = false;
-                isMoving = false;
-                isInWater = false;
-
-
-
-                // --- 1. MISE À JOUR DE LA CAMERA ---
-                camera.Offset = new Vector2(Raylib.GetScreenWidth() / 2.0f, Raylib.GetScreenHeight() / 2.0f);
-                Vector2 targetPosition = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
-                camera.Target = Vector2.Lerp(camera.Target, targetPosition, cameraSmoothing * deltaTime);
-
-                // --- 2. DÉTECTION DU TYPE DE SOL (AU SOL UNIQUEMENT) ---
-                bool isOnIce = false;
-                bool isOnNormalPlatform = false;
-
-                // On réutilise ton capteur de pieds actuel
-                Rectangle feetSensor = new Rectangle(player.X, player.Y + player.Height, player.Width, 2);
-
-                // 1. On regarde si on touche de la glace
-                foreach (var gla in ice)
-                {
-                    if (Raylib.CheckCollisionRecs(feetSensor, gla))
+                    if (Raylib.IsKeyPressed(KeyboardKey.P))
                     {
-                        isOnIce = true;
-                        break;
+                        isPlaying = !isPlaying;
                     }
-                }
-                // 2. On regarde si on touche une plateforme normale
-                if (!isOnIce)
-                {
-                    foreach (var plat in platforms)
+
+                    if (wallJumpLockTimer > 0) wallJumpLockTimer -= deltaTime;
+                    if (isInWater == true) waterTime -= deltaTime;
+
+                    if (currentSpeedX != 0)
                     {
-                        if (Raylib.CheckCollisionRecs(feetSensor, plat))
+                        flipX = currentSpeedX > 0 ? 1 : -1;
+                    }
+
+                    isGrounded = false;
+                    isMoving = false;
+                    isInWater = false;
+
+
+
+                    // --- 1. MISE À JOUR DE LA CAMERA ---
+                    camera.Offset = new Vector2(Raylib.GetScreenWidth() / 2.0f, Raylib.GetScreenHeight() / 2.0f);
+                    Vector2 targetPosition = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
+                    camera.Target = Vector2.Lerp(camera.Target, targetPosition, cameraSmoothing * deltaTime);
+
+                    // --- 2. DÉTECTION DU TYPE DE SOL (AU SOL UNIQUEMENT) ---
+                    bool isOnIce = false;
+                    bool isOnNormalPlatform = false;
+
+                    // On réutilise ton capteur de pieds actuel
+                    Rectangle feetSensor = new Rectangle(player.X, player.Y + player.Height, player.Width, 2);
+
+                    // 1. On regarde si on touche de la glace
+                    foreach (var gla in ice)
+                    {
+                        if (Raylib.CheckCollisionRecs(feetSensor, gla))
                         {
-                            isOnNormalPlatform = true;
+                            isOnIce = true;
                             break;
                         }
                     }
-                }
-                foreach (var wat in water)
-                {
-                    if (Raylib.CheckCollisionRecs(player, wat))
+                    // 2. On regarde si on touche une plateforme normale
+                    if (!isOnIce)
                     {
-                        isInWater = true;
-                        break;
-                    }
-                }
-
-                // 3. ON APPLIQUE LES RÈGLES UNIQUEMENT SI ON EST TOUCHÉ PAR UN SOL
-                // Si on est en l'air, on ne rentre pas dans ces conditions, donc on GARDE l'inertie du dernier sol !
-                if (isInWater)
-                {
-                    // L'eau prime sur le sol : on réduit la vitesse max même si on touche le fond
-                    maxSpeedX = 150f;
-                }
-                else if (isOnIce)
-                {
-                    acceleration = 500f;
-                    maxSpeedX = 400f;
-                }
-                else if (isOnNormalPlatform || isTouchingWallLeft || isTouchingWallRight)
-                {
-                    acceleration = 10000f;
-                    maxSpeedX = 250f;
-                }
-
-
-                // --- 3. DÉPLACEMENT HORIZONTAL (ENTRÉES + FRICTION) ---
-                bool inputPressed = false;
-                if (!isInDialogue && wallJumpLockTimer <= 0f && isPlaying)
-                {
-                    if (Raylib.IsKeyDown(KeyboardKey.A))
-                    {
-                        currentSpeedX -= acceleration * deltaTime;
-                        isMoving = true;
-                        inputPressed = true;
-                    }
-                    if (Raylib.IsKeyDown(KeyboardKey.D))
-                    {
-                        currentSpeedX += acceleration * deltaTime;
-                        isMoving = true;
-                        inputPressed = true;
-                    }
-                }
-
-
-                // Application de la friction selon le sol
-                if (!inputPressed)
-                {
-                    // Si on est en l'air, on met une friction très faible (ex: 200f) pour planer,
-                    // sinon on applique la friction du sol actuel
-                    float friction = normalFriction;
-
-                    if (!isGrounded)
-                    {
-                        friction = 200f; // Friction aérienne (garde l'élan en l'air)
-                    }
-                    else if (acceleration == 500f) // Une astuce pour savoir si on était configuré sur de la glace
-                    {
-                        friction = iceFriction;
-                    }
-
-                    if (currentSpeedX > 0)
-                    {
-                        currentSpeedX -= friction * deltaTime;
-                        if (currentSpeedX < 0) currentSpeedX = 0;
-                    }
-                    else if (currentSpeedX < 0)
-                    {
-                        currentSpeedX += friction * deltaTime;
-                        if (currentSpeedX > 0) currentSpeedX = 0;
-                    }
-                }
-
-                // Limitation de la vitesse max
-                if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
-                if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
-
-                // Forcer l'animation si le personnage glisse
-                if (MathF.Abs(currentSpeedX) > 10f) isMoving = true;
-
-                // --- 4. PHYSIQUE ET COLLISIONS X ---
-                float moveX = currentSpeedX * deltaTime;
-
-                if (isPlaying)
-                {
-                    playerpos.X += moveX;
-                    player.X = playerpos.X;
-                }
-
-                if (!slimeWLeverActivated) // On ne teste la collision que si la barrière est fermée
-                {
-                    if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
-                    {
-                        if (moveX > 0) playerpos.X = slimeWBarrier.X - player.Width;
-                        else if (moveX < 0) playerpos.X = slimeWBarrier.X + slimeWBarrier.Width;
-                        player.X = playerpos.X;
-                        currentSpeedX = 0;
-                    }
-                }
-
-                if (!MotherFlameLeverActivated) // On ne teste la collision que si la barrière est fermée
-                {
-                    if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
-                    {
-                        if (moveX > 0) playerpos.X = MotherFlameBarrier.X - player.Width;
-                        else if (moveX < 0) playerpos.X = MotherFlameBarrier.X + MotherFlameBarrier.Width;
-                        player.X = playerpos.X;
-                        currentSpeedX = 0;
-                    }
-                }
-
-                foreach (var plat in platforms)
-                {
-                    if (Raylib.CheckCollisionRecs(player, plat))
-                    {
-                        if (moveX > 0) playerpos.X = plat.X - player.Width;
-                        else if (moveX < 0) playerpos.X = plat.X + plat.Width;
-                        player.X = playerpos.X;
-                        currentSpeedX = 0;
-                        maxSpeedX = 250f;
-                        if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
-                    }
-                }
-                foreach (var plat in noWalljumpPlatforms)
-                {
-                    if (Raylib.CheckCollisionRecs(player, plat))
-                    {
-                        if (moveX > 0) playerpos.X = plat.X - player.Width;
-                        else if (moveX < 0) playerpos.X = plat.X + plat.Width;
-                        player.X = playerpos.X;
-                        currentSpeedX = 0;
-                        maxSpeedX = 250f;
-                        if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
-                    }
-                }
-                foreach (var gla in ice)
-                {
-                    if (Raylib.CheckCollisionRecs(player, gla))
-                    {
-                        if (moveX > 0) playerpos.X = gla.X - player.Width;
-                        else if (moveX < 0) playerpos.X = gla.X + gla.Width;
-                        player.X = playerpos.X;
-                        currentSpeedX = 0;
-                    }
-                }
-
-
-
-                // --- DÉTECTION DES MURS POUR LE WALL JUMP ---
-                isTouchingWallLeft = false;
-                isTouchingWallRight = false;
-
-                // On crée deux rectangles fins sur les côtés gauche et droit de la hitbox du joueur
-                Rectangle leftSensor = new Rectangle(player.X - 2, player.Y + 4, 2, player.Height - 8);
-                Rectangle rightSensor = new Rectangle(player.X + player.Width, player.Y + 4, 2, player.Height - 8);
-
-                //outils de debug
-                if (Raylib.IsKeyPressed(KeyboardKey.Enter) && isPlaying)
-                {
-                    canWallJump = true;
-                    canSwim = true;
-                    devMode = !devMode;
-                }
-                if (devMode)
-                {
-                    // Clic Droit : Téléportation en tenant compte de la caméra
-                    if (Raylib.IsMouseButtonPressed(MouseButton.Right))
-                    {
-                        // Obtient la position de la souris à l'écran
-                        Vector2 mouseScreenPos = Raylib.GetMousePosition();
-
-                        // La convertit en coordonnées dans le monde du jeu grâce à la caméra
-                        Vector2 mouseWorldPos = Raylib.GetScreenToWorld2D(mouseScreenPos, camera);
-
-                        // Repositionne le joueur
-                        playerpos.X = mouseWorldPos.X - (hitboxWidth / 2f);
-                        playerpos.Y = mouseWorldPos.Y - (hitboxHeight / 2f);
-                    }
-                }
-
-                // On vérifie si ces capteurs touchent une plateforme normale
-                foreach (var plat in platforms)
-                {
-                    if (Raylib.CheckCollisionRecs(leftSensor, plat)) isTouchingWallLeft = true;
-                    if (Raylib.CheckCollisionRecs(rightSensor, plat)) isTouchingWallRight = true;
-                }
-
-                // --- 5. GESTION DE L'ANIMATION SPRITE ---
-                if (isMoving)
-                {
-                    frameTimer += deltaTime;
-                    if (frameTimer >= frameSpeed)
-                    {
-                        frameTimer = 0.0f;
-                        currentFrame++;
-                        if (currentFrame >= totalFrames) currentFrame = 0;
-
-                        sourceRec.X = currentFrame * frameWidth;
-                    }
-                }
-                else
-                {
-                    currentFrame = 0;
-                    sourceRec.X = 0;
-                }
-
-                sourceRec.Width = frameWidth * flipX;
-
-                // --- 6. PHYSIQUE ET COLLISIONS Y ---
-                if (isPlaying)
-                {
-                    downspeed += gravity * deltaTime;
-                }
-                // --- GLISSEMENT SUR LE MUR (WALL SLIDE) ---
-                // On vérifie si le joueur touche un mur, qu'il est en l'air (!isGrounded), qu'il descend (downspeed > 0) et qu'il puisse wallJump
-                if ((isTouchingWallLeft || isTouchingWallRight) && !isGrounded && downspeed > 0 && canWallJump)
-                {
-                    if (downspeed > maxWallSlideSpeed)
-                    {
-                        downspeed = maxWallSlideSpeed;
-                    }
-                }
-                if (Raylib.IsKeyPressed(KeyboardKey.K))
-                {
-                    isPlaying = true;
-                }
-
-                // La physique de l'eau
-                // --- PHYSIQUE DE L'EAU ET NAGE ---
-                if (isInWater)
-                {
-                    if (canSwim)
-                    {
-                        // 1. On réinitialise le timer de noyade (le joueur ne meurt plus)
-                        waterTime = 5.0f;
-
-                        // 2. Trouver la surface de l'eau qu'on touche
-                        Rectangle currentWater = water.FirstOrDefault(w => Raylib.CheckCollisionRecs(player, w));
-
-                        if (currentWater.Width > 0)
+                        foreach (var plat in platforms)
                         {
-                            // Position CIBLE pour que le joueur soit "à moitié submergé"
-                            // Ex: Le haut du joueur dépasse de la moitié de sa hauteur par rapport à la surface
-                            float waterSurfaceY = currentWater.Y - (player.Height / 2f);
-
-                            // Si le joueur est en train de tomber dans l'eau
-                            if (downspeed > 0)
+                            if (Raylib.CheckCollisionRecs(feetSensor, plat))
                             {
-                                // Amortissement de la chute dans l'eau (effet d'impact fluide)
-                                downspeed = Vector2.Lerp(new Vector2(0, downspeed), Vector2.Zero, 10f * deltaTime).Y;
-
-                                // Si le joueur est descendu plus bas que la surface
-                                if (playerpos.Y > waterSurfaceY)
-                                {
-                                    // On le fait flotter doucement vers la surface (poussée d'Archimède)
-                                    playerpos.Y = MathF.Min(playerpos.Y, waterSurfaceY);
-                                    downspeed = 0;
-                                }
-                            }
-                            else if (downspeed == 0 && playerpos.Y > waterSurfaceY)
-                            {
-                                // Flottabilité passive : ramène le personnage à la surface s'il s'enfonce
-                                playerpos.Y = Vector2.Lerp(new Vector2(0, playerpos.Y), new Vector2(0, waterSurfaceY), 8f * deltaTime).Y;
+                                isOnNormalPlatform = true;
+                                break;
                             }
                         }
-
-                        // 3. Vitesse de déplacement horizontal à la surface
-                        maxSpeedX = 200f;
-
-                        // 4. SAUT DEPUIS LA SURFACE
-                        // Permet de sauter hors de l'eau avec la touche Espace
-                        if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
+                    }
+                    foreach (var wat in water)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, wat))
                         {
-                            downspeed = -450f; // Impulsion de saut pour sortir du lac
+                            isInWater = true;
+                            break;
+                        }
+                    }
+
+                    // 3. ON APPLIQUE LES RÈGLES UNIQUEMENT SI ON EST TOUCHÉ PAR UN SOL
+                    // Si on est en l'air, on ne rentre pas dans ces conditions, donc on GARDE l'inertie du dernier sol !
+                    if (isInWater)
+                    {
+                        // L'eau prime sur le sol : on réduit la vitesse max même si on touche le fond
+                        maxSpeedX = 150f;
+                    }
+                    else if (isOnIce)
+                    {
+                        acceleration = 500f;
+                        maxSpeedX = 400f;
+                    }
+                    else if (isOnNormalPlatform || isTouchingWallLeft || isTouchingWallRight)
+                    {
+                        acceleration = 10000f;
+                        maxSpeedX = 250f;
+                    }
+
+
+                    // --- 3. DÉPLACEMENT HORIZONTAL (ENTRÉES + FRICTION) ---
+                    bool inputPressed = false;
+                    if (!isInDialogue && wallJumpLockTimer <= 0f && isPlaying)
+                    {
+                        if (Raylib.IsKeyDown(KeyboardKey.A))
+                        {
+                            currentSpeedX -= acceleration * deltaTime;
+                            isMoving = true;
+                            inputPressed = true;
+                        }
+                        if (Raylib.IsKeyDown(KeyboardKey.D))
+                        {
+                            currentSpeedX += acceleration * deltaTime;
+                            isMoving = true;
+                            inputPressed = true;
+                        }
+                    }
+
+
+                    // Application de la friction selon le sol
+                    if (!inputPressed)
+                    {
+                        // Si on est en l'air, on met une friction très faible (ex: 200f) pour planer,
+                        // sinon on applique la friction du sol actuel
+                        float friction = normalFriction;
+
+                        if (!isGrounded)
+                        {
+                            friction = 200f; // Friction aérienne (garde l'élan en l'air)
+                        }
+                        else if (acceleration == 500f) // Une astuce pour savoir si on était configuré sur de la glace
+                        {
+                            friction = iceFriction;
+                        }
+
+                        if (currentSpeedX > 0)
+                        {
+                            currentSpeedX -= friction * deltaTime;
+                            if (currentSpeedX < 0) currentSpeedX = 0;
+                        }
+                        else if (currentSpeedX < 0)
+                        {
+                            currentSpeedX += friction * deltaTime;
+                            if (currentSpeedX > 0) currentSpeedX = 0;
+                        }
+                    }
+
+                    // Limitation de la vitesse max
+                    if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                    if (currentSpeedX < -maxSpeedX) currentSpeedX = -maxSpeedX;
+
+                    // Forcer l'animation si le personnage glisse
+                    if (MathF.Abs(currentSpeedX) > 10f) isMoving = true;
+
+                    // --- 4. PHYSIQUE ET COLLISIONS X ---
+                    float moveX = currentSpeedX * deltaTime;
+
+                    if (isPlaying)
+                    {
+                        playerpos.X += moveX;
+                        player.X = playerpos.X;
+                    }
+
+                    if (!slimeWLeverActivated) // On ne teste la collision que si la barrière est fermée
+                    {
+                        if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
+                        {
+                            if (moveX > 0) playerpos.X = slimeWBarrier.X - player.Width;
+                            else if (moveX < 0) playerpos.X = slimeWBarrier.X + slimeWBarrier.Width;
+                            player.X = playerpos.X;
+                            currentSpeedX = 0;
+                        }
+                    }
+
+                    if (!MotherFlameLeverActivated) // On ne teste la collision que si la barrière est fermée
+                    {
+                        if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
+                        {
+                            if (moveX > 0) playerpos.X = MotherFlameBarrier.X - player.Width;
+                            else if (moveX < 0) playerpos.X = MotherFlameBarrier.X + MotherFlameBarrier.Width;
+                            player.X = playerpos.X;
+                            currentSpeedX = 0;
+                        }
+                    }
+
+                    foreach (var plat in platforms)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, plat))
+                        {
+                            if (moveX > 0) playerpos.X = plat.X - player.Width;
+                            else if (moveX < 0) playerpos.X = plat.X + plat.Width;
+                            player.X = playerpos.X;
+                            currentSpeedX = 0;
+                            maxSpeedX = 250f;
+                            if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                        }
+                    }
+                    foreach (var plat in noWalljumpPlatforms)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, plat))
+                        {
+                            if (moveX > 0) playerpos.X = plat.X - player.Width;
+                            else if (moveX < 0) playerpos.X = plat.X + plat.Width;
+                            player.X = playerpos.X;
+                            currentSpeedX = 0;
+                            maxSpeedX = 250f;
+                            if (currentSpeedX > maxSpeedX) currentSpeedX = maxSpeedX;
+                        }
+                    }
+                    foreach (var gla in ice)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, gla))
+                        {
+                            if (moveX > 0) playerpos.X = gla.X - player.Width;
+                            else if (moveX < 0) playerpos.X = gla.X + gla.Width;
+                            player.X = playerpos.X;
+                            currentSpeedX = 0;
+                        }
+                    }
+
+
+
+                    // --- DÉTECTION DES MURS POUR LE WALL JUMP ---
+                    isTouchingWallLeft = false;
+                    isTouchingWallRight = false;
+
+                    // On crée deux rectangles fins sur les côtés gauche et droit de la hitbox du joueur
+                    Rectangle leftSensor = new Rectangle(player.X - 2, player.Y + 4, 2, player.Height - 8);
+                    Rectangle rightSensor = new Rectangle(player.X + player.Width, player.Y + 4, 2, player.Height - 8);
+
+                    //outils de debug
+                    if (Raylib.IsKeyPressed(KeyboardKey.Enter) && isPlaying)
+                    {
+                        canWallJump = true;
+                        canSwim = true;
+                        devMode = !devMode;
+                        isSwordrepaired = true;
+                    }
+                    if (devMode)
+                    {
+                        // Clic Droit : Téléportation en tenant compte de la caméra
+                        if (Raylib.IsMouseButtonPressed(MouseButton.Right))
+                        {
+                            // Obtient la position de la souris à l'écran
+                            Vector2 mouseScreenPos = Raylib.GetMousePosition();
+
+                            // La convertit en coordonnées dans le monde du jeu grâce à la caméra
+                            Vector2 mouseWorldPos = Raylib.GetScreenToWorld2D(mouseScreenPos, camera);
+
+                            // Repositionne le joueur
+                            playerpos.X = mouseWorldPos.X - (hitboxWidth / 2f);
+                            playerpos.Y = mouseWorldPos.Y - (hitboxHeight / 2f);
+                        }
+                        if (Raylib.IsKeyPressed(KeyboardKey.N))
+                        {
+                            isGameEnded = true;
+                        }
+                    }
+
+                    // On vérifie si ces capteurs touchent une plateforme normale
+                    foreach (var plat in platforms)
+                    {
+                        if (Raylib.CheckCollisionRecs(leftSensor, plat)) isTouchingWallLeft = true;
+                        if (Raylib.CheckCollisionRecs(rightSensor, plat)) isTouchingWallRight = true;
+                    }
+
+                    // --- 5. GESTION DE L'ANIMATION SPRITE ---
+                    if (isMoving)
+                    {
+                        frameTimer += deltaTime;
+                        if (frameTimer >= frameSpeed)
+                        {
+                            frameTimer = 0.0f;
+                            currentFrame++;
+                            if (currentFrame >= totalFrames) currentFrame = 0;
+
+                            sourceRec.X = currentFrame * frameWidth;
                         }
                     }
                     else
                     {
-                        // SANS POUVOIR : Le joueur coule et se noie
-                        if (downspeed > 100f) downspeed = 100f;
+                        currentFrame = 0;
+                        sourceRec.X = 0;
                     }
-                }
 
-                float moveY = (float)downspeed * deltaTime;
-                if (isPlaying)
-                {
-                    playerpos.Y += moveY;
-                    player.Y = playerpos.Y;
-                }
-                if (!slimeWLeverActivated)
-                {
-                    if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
+                    sourceRec.Width = frameWidth * flipX;
+
+                    // --- 6. PHYSIQUE ET COLLISIONS Y ---
+                    if (isPlaying)
                     {
-                        if (downspeed > 0)
+                        downspeed += gravity * deltaTime;
+                    }
+                    // --- GLISSEMENT SUR LE MUR (WALL SLIDE) ---
+                    // On vérifie si le joueur touche un mur, qu'il est en l'air (!isGrounded), qu'il descend (downspeed > 0) et qu'il puisse wallJump
+                    if ((isTouchingWallLeft || isTouchingWallRight) && !isGrounded && downspeed > 0 && canWallJump)
+                    {
+                        if (downspeed > maxWallSlideSpeed)
                         {
-                            playerpos.Y = slimeWBarrier.Y - player.Height;
-                            downspeed = 0;
-                            isGrounded = true;
+                            downspeed = maxWallSlideSpeed;
                         }
-                        else if (downspeed < 0)
+                    }
+                    if (Raylib.IsKeyPressed(KeyboardKey.K))
+                    {
+                        isPlaying = true;
+                    }
+
+                    // La physique de l'eau
+                    // --- PHYSIQUE DE L'EAU ET NAGE ---
+                    if (isInWater)
+                    {
+                        if (canSwim)
                         {
-                            playerpos.Y = slimeWBarrier.Y + slimeWBarrier.Height;
-                            downspeed = 0;
+                            // 1. On réinitialise le timer de noyade (le joueur ne meurt plus)
+                            waterTime = 5.0f;
+
+                            // 2. Trouver la surface de l'eau qu'on touche
+                            Rectangle currentWater = water.FirstOrDefault(w => Raylib.CheckCollisionRecs(player, w));
+
+                            if (currentWater.Width > 0)
+                            {
+                                // Position CIBLE pour que le joueur soit "à moitié submergé"
+                                // Ex: Le haut du joueur dépasse de la moitié de sa hauteur par rapport à la surface
+                                float waterSurfaceY = currentWater.Y - (player.Height / 2f);
+
+                                // Si le joueur est en train de tomber dans l'eau
+                                if (downspeed > 0)
+                                {
+                                    // Amortissement de la chute dans l'eau (effet d'impact fluide)
+                                    downspeed = Vector2.Lerp(new Vector2(0, downspeed), Vector2.Zero, 10f * deltaTime).Y;
+
+                                    // Si le joueur est descendu plus bas que la surface
+                                    if (playerpos.Y > waterSurfaceY)
+                                    {
+                                        // On le fait flotter doucement vers la surface (poussée d'Archimède)
+                                        playerpos.Y = MathF.Min(playerpos.Y, waterSurfaceY);
+                                        downspeed = 0;
+                                    }
+                                }
+                                else if (downspeed == 0 && playerpos.Y > waterSurfaceY)
+                                {
+                                    // Flottabilité passive : ramène le personnage à la surface s'il s'enfonce
+                                    playerpos.Y = Vector2.Lerp(new Vector2(0, playerpos.Y), new Vector2(0, waterSurfaceY), 8f * deltaTime).Y;
+                                }
+                            }
+
+                            // 3. Vitesse de déplacement horizontal à la surface
+                            maxSpeedX = 200f;
+
+                            // 4. SAUT DEPUIS LA SURFACE
+                            // Permet de sauter hors de l'eau avec la touche Espace
+                            if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
+                            {
+                                downspeed = -450f; // Impulsion de saut pour sortir du lac
+                            }
                         }
+                        else
+                        {
+                            // SANS POUVOIR : Le joueur coule et se noie
+                            if (downspeed > 100f) downspeed = 100f;
+                        }
+                    }
+
+                    float moveY = (float)downspeed * deltaTime;
+                    if (isPlaying)
+                    {
+                        playerpos.Y += moveY;
                         player.Y = playerpos.Y;
                     }
-                }
-
-                if (!MotherFlameLeverActivated)
-                {
-                    if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
+                    if (!slimeWLeverActivated)
                     {
-                        if (downspeed > 0)
+                        if (Raylib.CheckCollisionRecs(player, slimeWBarrier))
                         {
-                            playerpos.Y = MotherFlameBarrier.Y - player.Height;
-                            downspeed = 0;
-                            isGrounded = true;
-                        }
-                        else if (downspeed < 0)
-                        {
-                            playerpos.Y = MotherFlameBarrier.Y + MotherFlameBarrier.Height;
-                            downspeed = 0;
-                        }
-                        player.Y = playerpos.Y;
-                    }
-                }
-
-                foreach (var plat in platforms)
-                {
-                    if (Raylib.CheckCollisionRecs(player, plat))
-                    {
-                        if (downspeed > 0)
-                        {
-                            playerpos.Y = plat.Y - player.Height;
-                            downspeed = 0;
-                            isGrounded = true;
-                        }
-                        else if (downspeed < 0)
-                        {
-                            playerpos.Y = plat.Y + plat.Height;
-                            downspeed = 0;
-                        }
-                        player.Y = playerpos.Y;
-                    }
-                }
-
-                foreach (var plat in noWalljumpPlatforms)
-                {
-                    if (Raylib.CheckCollisionRecs(player, plat))
-                    {
-                        if (downspeed > 0)
-                        {
-                            playerpos.Y = plat.Y - player.Height;
-                            downspeed = 0;
-                            isGrounded = true;
-                        }
-                        else if (downspeed < 0)
-                        {
-                            playerpos.Y = plat.Y + plat.Height;
-                            downspeed = 0;
-                        }
-                        player.Y = playerpos.Y;
-                    }
-                }
-
-                foreach (var gla in ice)
-                {
-                    if (Raylib.CheckCollisionRecs(player, gla))
-                    {
-                        if (downspeed > 0)
-                        {
-                            playerpos.Y = gla.Y - player.Height;
-                            downspeed = 0;
-                            isGrounded = true;
-                        }
-                        else if (downspeed < 0)
-                        {
-                            playerpos.Y = gla.Y + gla.Height;
-                            downspeed = 0;
-                        }
-                        player.Y = playerpos.Y;
-                    }
-                }
-
-                // --- 7. SENSORS SAUT / COYOTE TIME ---
-                if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying) jumpBufferCounter = jumpBufferDuration;
-                else jumpBufferCounter -= deltaTime;
-
-                if (isGrounded && !isInWater)
-                {
-                    coyoteTimeCounter = coyoteTimeDuration;
-                    lastSafePosition = playerpos;
-                }
-                else coyoteTimeCounter -= deltaTime;
-
-                if (jumpBufferCounter > 0 && !isInWater && !isInDialogue)
-                {
-                    // 1. Saut Normal au sol
-                    if (coyoteTimeCounter > 0)
-                    {
-                        downspeed = -500;
-                        coyoteTimeCounter = 0;
-                        jumpBufferCounter = 0;
-                    }
-                    // 2. Wall Jump sur un mur à GAUCHE (on est propulsé vers la DROITE)
-                    else if (canWallJump && isTouchingWallLeft && !isGrounded)
-                    {
-                        downspeed = wallJumpForceY;
-                        currentSpeedX = wallJumpForceX; // Impulsion vers la droite
-                        jumpBufferCounter = 0;
-                        coyoteTimeCounter = 0;
-                        wallJumpLockTimer = 0.4f;
-                    }
-                    // 3. Wall Jump sur un mur à DROITE (on est propulsé vers la GAUCHE)
-                    else if (canWallJump && isTouchingWallRight && !isGrounded)
-                    {
-                        downspeed = wallJumpForceY;
-                        currentSpeedX = -wallJumpForceX; // Impulsion vers la gauche
-                        jumpBufferCounter = 0;
-                        coyoteTimeCounter = 0;
-                        wallJumpLockTimer = 0.4f;
-                    }
-                    
-                }
-
-                if (Raylib.IsKeyReleased(KeyboardKey.Space) && downspeed < 0)
-                {
-                    downspeed *= 0.5f;
-                }
-
-                foreach (var stal in stalactites)
-                {
-                    // --- LOGIQUE DE REAPPARITION DES STALACTITES---
-                    if (stal.IsDestroyed)
-                    {
-                        stal.RespawnTimer += deltaTime; // On compte les secondes
-
-                        if (stal.RespawnTimer >= stal.RespawnDelay)
-                        {
-                            // Reset complet de la stalactite !
-                            stal.IsDestroyed = false;
-                            stal.IsFalling = false;
-                            stal.FallSpeed = 0f;
-                            stal.Hitbox.Y = stal.SpawnY; // Elle revient au plafond
-                            stal.RespawnTimer = 0f;      // On remet le chrono à zéro
-                        }
-
-                        continue; // Tant qu'elle n'a pas fini de recharger, on ignore le reste de sa physique
-                    }
-                    // 1. Détection du joueur
-                    if (!stal.IsFalling && Raylib.CheckCollisionRecs(player, stal.DetectionZone))
-                    {
-                        stal.IsFalling = true;
-                    }
-
-                    // 2. Si elle tombe, on applique la physique
-                    if (stal.IsFalling)
-                    {
-                        stal.FallSpeed += stalactiteGravity * deltaTime;
-                        stal.Hitbox.Y += stal.FallSpeed * deltaTime;
-
-                        // Collision avec le JOUEUR
-                        if (Raylib.CheckCollisionRecs(player, stal.Hitbox))
-                        {
-                            stal.IsDestroyed = true;
-                            wallJumpLockTimer = 0.8f;  //Permet d'éviter que le joueur se raccroche au mur a la frame après s'être fait toucher 
-
-                            // --- SYSTÈME DE KNOCKBACK CORRIGÉ ---
-                            float pushDirection = 0f;
-
-                            if (isTouchingWallRight)
+                            if (downspeed > 0)
                             {
-                                // Si on est sur le mur de droite, on est éjecté vers la GAUCHE
-                                pushDirection = -1.0f;
+                                playerpos.Y = slimeWBarrier.Y - player.Height;
+                                downspeed = 0;
+                                isGrounded = true;
                             }
-                            else if (isTouchingWallLeft)
+                            else if (downspeed < 0)
                             {
-                                // Si on est sur le mur de gauche, on est éjecté vers la DROITE
-                                pushDirection = 1.0f;
+                                playerpos.Y = slimeWBarrier.Y + slimeWBarrier.Height;
+                                downspeed = 0;
                             }
-                            else
+                            player.Y = playerpos.Y;
+                        }
+                    }
+
+                    if (!MotherFlameLeverActivated)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, MotherFlameBarrier))
+                        {
+                            if (downspeed > 0)
                             {
-                                // Comportement classique si on est en plein vol (basé sur le centre)
-                                pushDirection = (player.X + player.Width / 2 > stal.Hitbox.X + stal.Hitbox.Width / 2) ? 1.0f : -1.0f;
+                                playerpos.Y = MotherFlameBarrier.Y - player.Height;
+                                downspeed = 0;
+                                isGrounded = true;
+                            }
+                            else if (downspeed < 0)
+                            {
+                                playerpos.Y = MotherFlameBarrier.Y + MotherFlameBarrier.Height;
+                                downspeed = 0;
+                            }
+                            player.Y = playerpos.Y;
+                        }
+                    }
+
+                    foreach (var plat in platforms)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, plat))
+                        {
+                            if (downspeed > 0)
+                            {
+                                playerpos.Y = plat.Y - player.Height;
+                                downspeed = 0;
+                                isGrounded = true;
+                            }
+                            else if (downspeed < 0)
+                            {
+                                playerpos.Y = plat.Y + plat.Height;
+                                downspeed = 0;
+                            }
+                            player.Y = playerpos.Y;
+                        }
+                    }
+
+                    foreach (var plat in noWalljumpPlatforms)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, plat))
+                        {
+                            if (downspeed > 0)
+                            {
+                                playerpos.Y = plat.Y - player.Height;
+                                downspeed = 0;
+                                isGrounded = true;
+                            }
+                            else if (downspeed < 0)
+                            {
+                                playerpos.Y = plat.Y + plat.Height;
+                                downspeed = 0;
+                            }
+                            player.Y = playerpos.Y;
+                        }
+                    }
+
+                    foreach (var gla in ice)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, gla))
+                        {
+                            if (downspeed > 0)
+                            {
+                                playerpos.Y = gla.Y - player.Height;
+                                downspeed = 0;
+                                isGrounded = true;
+                            }
+                            else if (downspeed < 0)
+                            {
+                                playerpos.Y = gla.Y + gla.Height;
+                                downspeed = 0;
+                            }
+                            player.Y = playerpos.Y;
+                        }
+                    }
+
+                    // --- 7. SENSORS SAUT / COYOTE TIME ---
+                    if (Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying) jumpBufferCounter = jumpBufferDuration;
+                    else jumpBufferCounter -= deltaTime;
+
+                    if (isGrounded && !isInWater)
+                    {
+                        coyoteTimeCounter = coyoteTimeDuration;
+                        lastSafePosition = playerpos;
+                    }
+                    else coyoteTimeCounter -= deltaTime;
+
+                    if (jumpBufferCounter > 0 && !isInWater && !isInDialogue)
+                    {
+                        // 1. Saut Normal au sol
+                        if (coyoteTimeCounter > 0)
+                        {
+                            downspeed = -500;
+                            coyoteTimeCounter = 0;
+                            jumpBufferCounter = 0;
+                        }
+                        // 2. Wall Jump sur un mur à GAUCHE (on est propulsé vers la DROITE)
+                        else if (canWallJump && isTouchingWallLeft && !isGrounded)
+                        {
+                            downspeed = wallJumpForceY;
+                            currentSpeedX = wallJumpForceX; // Impulsion vers la droite
+                            jumpBufferCounter = 0;
+                            coyoteTimeCounter = 0;
+                            wallJumpLockTimer = 0.4f;
+                        }
+                        // 3. Wall Jump sur un mur à DROITE (on est propulsé vers la GAUCHE)
+                        else if (canWallJump && isTouchingWallRight && !isGrounded)
+                        {
+                            downspeed = wallJumpForceY;
+                            currentSpeedX = -wallJumpForceX; // Impulsion vers la gauche
+                            jumpBufferCounter = 0;
+                            coyoteTimeCounter = 0;
+                            wallJumpLockTimer = 0.4f;
+                        }
+
+                    }
+
+                    if (Raylib.IsKeyReleased(KeyboardKey.Space) && downspeed < 0)
+                    {
+                        downspeed *= 0.5f;
+                    }
+
+                    foreach (var stal in stalactites)
+                    {
+                        // --- LOGIQUE DE REAPPARITION DES STALACTITES---
+                        if (stal.IsDestroyed)
+                        {
+                            stal.RespawnTimer += deltaTime; // On compte les secondes
+
+                            if (stal.RespawnTimer >= stal.RespawnDelay)
+                            {
+                                // Reset complet de la stalactite !
+                                stal.IsDestroyed = false;
+                                stal.IsFalling = false;
+                                stal.FallSpeed = 0f;
+                                stal.Hitbox.Y = stal.SpawnY; // Elle revient au plafond
+                                stal.RespawnTimer = 0f;      // On remet le chrono à zéro
                             }
 
-                            currentSpeedX = pushDirection * 500f; // Propulse le joueur horizontalement
-                            downspeed = -200f;                    // Un petit saut vers le haut pour le décoller du sol
-                            coyoteTimeCounter = 0;                // Annule le coyote time pour l'empêcher de sauter immédiatement
-
+                            continue; // Tant qu'elle n'a pas fini de recharger, on ignore le reste de sa physique
+                        }
+                        // 1. Détection du joueur
+                        if (!stal.IsFalling && Raylib.CheckCollisionRecs(player, stal.DetectionZone))
+                        {
+                            stal.IsFalling = true;
                         }
 
-                        // Collision avec le SOL (Plateformes ou Glace)
-                        foreach (var plat in platforms)
+                        // 2. Si elle tombe, on applique la physique
+                        if (stal.IsFalling)
                         {
-                            if (Raylib.CheckCollisionRecs(stal.Hitbox, plat)) stal.IsDestroyed = true;
-                        }
-                        foreach (var gla in ice)
-                        {
-                            if (Raylib.CheckCollisionRecs(stal.Hitbox, gla)) stal.IsDestroyed = true;
-                        }
-                    }
-                }
-                foreach (var death in deathZone)
-                {
-                    if (MotherFlameLeverActivated)
-                    {
-                        if (death.type == "movingObjectL/R")
-                        {
-                            // Déplacement Aller-Retour
-                            death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
+                            stal.FallSpeed += stalactiteGravity * deltaTime;
+                            stal.Hitbox.Y += stal.FallSpeed * deltaTime;
 
-                            if (death.Hitbox.X >= death.RightBound)
+                            // Collision avec le JOUEUR
+                            if (Raylib.CheckCollisionRecs(player, stal.Hitbox))
                             {
-                                death.Hitbox.X = death.RightBound;
-                                death.Direction = -1;
+                                stal.IsDestroyed = true;
+                                wallJumpLockTimer = 0.8f;  //Permet d'éviter que le joueur se raccroche au mur a la frame après s'être fait toucher 
+
+                                // --- SYSTÈME DE KNOCKBACK CORRIGÉ ---
+                                float pushDirection = 0f;
+
+                                if (isTouchingWallRight)
+                                {
+                                    // Si on est sur le mur de droite, on est éjecté vers la GAUCHE
+                                    pushDirection = -1.0f;
+                                }
+                                else if (isTouchingWallLeft)
+                                {
+                                    // Si on est sur le mur de gauche, on est éjecté vers la DROITE
+                                    pushDirection = 1.0f;
+                                }
+                                else
+                                {
+                                    // Comportement classique si on est en plein vol (basé sur le centre)
+                                    pushDirection = (player.X + player.Width / 2 > stal.Hitbox.X + stal.Hitbox.Width / 2) ? 1.0f : -1.0f;
+                                }
+
+                                currentSpeedX = pushDirection * 500f; // Propulse le joueur horizontalement
+                                downspeed = -200f;                    // Un petit saut vers le haut pour le décoller du sol
+                                coyoteTimeCounter = 0;                // Annule le coyote time pour l'empêcher de sauter immédiatement
+
                             }
-                            else if (death.Hitbox.X <= death.LeftBound)
-                            {
-                                death.Hitbox.X = death.LeftBound;
-                                death.Direction = 1;
-                            }
-                        }
-                        else if (death.type == "movingObjectU/D")
-                        {
-                            // Déplacement Aller-Retour
-                            death.Hitbox.Y += death.Speed.Y * death.Direction * deltaTime;
 
-                            if (death.Hitbox.Y >= death.DownBound)
+                            // Collision avec le SOL (Plateformes ou Glace)
+                            foreach (var plat in platforms)
                             {
-                                death.Hitbox.Y = death.DownBound;
-                                death.Direction = -1;
+                                if (Raylib.CheckCollisionRecs(stal.Hitbox, plat)) stal.IsDestroyed = true;
                             }
-                            else if (death.Hitbox.Y <= death.UpBound)
+                            foreach (var gla in ice)
                             {
-                                death.Hitbox.Y = death.UpBound;
-                                death.Direction = 1;
+                                if (Raylib.CheckCollisionRecs(stal.Hitbox, gla)) stal.IsDestroyed = true;
                             }
                         }
                     }
-                }
-                // --- INTERACTION LEVIER ---
-                Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
-                Vector2 slimeWLeverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
-                Vector2 MotherFLameLeverCenter = new Vector2(MotherFlameLeverTrigger.X + MotherFlameLeverTrigger.Width / 2, MotherFlameLeverTrigger.Y + MotherFlameLeverTrigger.Height / 2);
-
-                if (Vector2.Distance(playerCenter, slimeWLeverCenter) < interactionRadius && !slimeWLeverActivated)
-                {
-                    // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
-                    if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue && isPlaying)
+                    foreach (var death in deathZone)
                     {
-                        isInDialogue = true;
-                        dialogueStep = -1;
-                        currentSpeedX = 0; // On stoppe net le joueur
-                        slimeWLeverActivated = true;    // La barrière s'ouvre !
-                        currentTalkingSlime = slimeW;
+                        if (MotherFlameLeverActivated)
+                        {
+                            if (death.type == "movingObjectL/R")
+                            {
+                                // Déplacement Aller-Retour
+                                death.Hitbox.X += death.Speed.X * death.Direction * deltaTime;
+
+                                if (death.Hitbox.X >= death.RightBound)
+                                {
+                                    death.Hitbox.X = death.RightBound;
+                                    death.Direction = -1;
+                                }
+                                else if (death.Hitbox.X <= death.LeftBound)
+                                {
+                                    death.Hitbox.X = death.LeftBound;
+                                    death.Direction = 1;
+                                }
+                            }
+                            else if (death.type == "movingObjectU/D")
+                            {
+                                // Déplacement Aller-Retour
+                                death.Hitbox.Y += death.Speed.Y * death.Direction * deltaTime;
+
+                                if (death.Hitbox.Y >= death.DownBound)
+                                {
+                                    death.Hitbox.Y = death.DownBound;
+                                    death.Direction = -1;
+                                }
+                                else if (death.Hitbox.Y <= death.UpBound)
+                                {
+                                    death.Hitbox.Y = death.UpBound;
+                                    death.Direction = 1;
+                                }
+                            }
+                        }
                     }
-                }
+                    // --- INTERACTION LEVIER ---
+                    Vector2 playerCenter = new Vector2(player.X + player.Width / 2, player.Y + player.Height / 2);
+                    Vector2 slimeWLeverCenter = new Vector2(slimeWLeverTrigger.X + slimeWLeverTrigger.Width / 2, slimeWLeverTrigger.Y + slimeWLeverTrigger.Height / 2);
+                    Vector2 MotherFLameLeverCenter = new Vector2(MotherFlameLeverTrigger.X + MotherFlameLeverTrigger.Width / 2, MotherFlameLeverTrigger.Y + MotherFlameLeverTrigger.Height / 2);
 
-                if (Vector2.Distance(playerCenter, MotherFLameLeverCenter) < interactionRadius && !MotherFlameLeverActivated)
-                {
-                    if (Raylib.IsKeyPressed(KeyboardKey.E) && isPlaying)
+                    if (Vector2.Distance(playerCenter, slimeWLeverCenter) < interactionRadius && !slimeWLeverActivated)
                     {
-                        MotherFlameLeverActivated = true;
-                        slimes[2].Color = new Color(184, 24, 6);
-                        List<string> FireDialogue2 = new List<string>
+                        // Si on appuie sur E et qu'on ne parle pas encore : on lance le dialogue
+                        if (Raylib.IsKeyPressed(KeyboardKey.E) && !isInDialogue && isPlaying)
+                        {
+                            isInDialogue = true;
+                            dialogueStep = -1;
+                            currentSpeedX = 0; // On stoppe net le joueur
+                            slimeWLeverActivated = true;    // La barrière s'ouvre !
+                            currentTalkingSlime = slimeW;
+                        }
+                    }
+
+                    if (Vector2.Distance(playerCenter, MotherFLameLeverCenter) < interactionRadius && !MotherFlameLeverActivated)
+                    {
+                        if (Raylib.IsKeyPressed(KeyboardKey.E) && isPlaying)
+                        {
+                            MotherFlameLeverActivated = true;
+                            slimes[2].Color = new Color(184, 24, 6);
+                            List<string> FireDialogue2 = new List<string>
                         {
                         "Slime : Merci, tu as reussi à nous sauver.",
                         "Slime : En guise de remerciement, je vais reforger ton épée avec la force de la Flamme Mère.",
                         "Slime : Avec ça tu pourras battre les orcs."
                         };
-                        slimes[2].dialogue = FireDialogue2;
-                    }
-                }
-
-                Vector2 slimeACenter = new Vector2(slimeA.body.X + slimeA.body.Width / 2, slimeA.body.Y + slimeA.body.Height / 2);
-
-                if (Vector2.Distance(playerCenter, slimeACenter) < 200 && !slimeA.isAllied && playerpos.Y <= -1800)
-                {
-                    if (!isInDialogue)
-                    {
-                        isInDialogue = true;
-                        dialogueStep = 0;
-                        currentSpeedX = 0; // On stoppe net le joueur
-                        currentTalkingSlime = slimeA;
-                    }
-                }
-
-                Vector2 slimeFCenter = new Vector2(slimeF.body.X + slimeF.body.Width / 2, slimeF.body.Y + slimeF.body.Height / 2);
-
-                if (Vector2.Distance(playerCenter, slimeFCenter) < 200 && !slimeA.isAllied)
-                {
-                    if (!isInDialogue && Raylib.IsKeyPressed(KeyboardKey.E))
-                    {
-                        isInDialogue = true;
-                        dialogueStep = -1;
-                        currentSpeedX = 0; // On stoppe net le joueur
-                        currentTalkingSlime = slimeF;
-                    }
-                }
-
-
-                // --- GESTION DE LA PROGRESSION DU DIALOGUE ---
-                if (isInDialogue && currentTalkingSlime != null)
-                {
-                    if (Raylib.IsKeyPressed(KeyboardKey.E) || Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
-                    {
-                        dialogueStep++;
-
-                        // Si on a lu toutes les lignes
-                        if (dialogueStep >= currentTalkingSlime.dialogue.Count)
-                        {
-                            isInDialogue = false;          // On ferme la boîte de dialogue
-
-                            if (currentTalkingSlime == slimeW)
-                            {
-                                canWallJump = true;
-                            }
-                            else if (currentTalkingSlime == slimeA)
-                            {
-                                canSwim = true;
-                            }
-                            else if (currentTalkingSlime == slimeF)
-                            {
-                                isSwordrepaired = true;
-                            }
-                            // Passer le bon slime en allié
-                            if (currentTalkingSlime != slimeF)
-                            {
-                                currentTalkingSlime.isAllied = true;
-                            }
-                            // Réinitialiser la référence
-                            currentTalkingSlime = null;
+                            slimes[2].dialogue = FireDialogue2;
                         }
                     }
-                }
 
-                foreach (var death in deathZone)
-                {
-                    if (Raylib.CheckCollisionRecs(player, death.Hitbox))
+                    Vector2 slimeACenter = new Vector2(slimeA.body.X + slimeA.body.Width / 2, slimeA.body.Y + slimeA.body.Height / 2);
+
+                    if (Vector2.Distance(playerCenter, slimeACenter) < 200 && !slimeA.isAllied && playerpos.Y <= -1800)
                     {
+                        if (!isInDialogue)
+                        {
+                            isInDialogue = true;
+                            dialogueStep = 0;
+                            currentSpeedX = 0; // On stoppe net le joueur
+                            currentTalkingSlime = slimeA;
+                        }
+                    }
 
-                        playerpos = death.respawnLocation;
-                        player.X = death.respawnLocation.X;
-                        player.Y = death.respawnLocation.Y;
+                    Vector2 slimeFCenter = new Vector2(slimeF.body.X + slimeF.body.Width / 2, slimeF.body.Y + slimeF.body.Height / 2);
+
+                    if (Vector2.Distance(playerCenter, slimeFCenter) < 200 && !slimeA.isAllied)
+                    {
+                        if (!isInDialogue && Raylib.IsKeyPressed(KeyboardKey.E))
+                        {
+                            isInDialogue = true;
+                            dialogueStep = -1;
+                            currentSpeedX = 0; // On stoppe net le joueur
+                            currentTalkingSlime = slimeF;
+                        }
+                    }
+
+
+                    // --- GESTION DE LA PROGRESSION DU DIALOGUE ---
+                    if (isInDialogue && currentTalkingSlime != null)
+                    {
+                        if (Raylib.IsKeyPressed(KeyboardKey.E) || Raylib.IsKeyPressed(KeyboardKey.Space) && isPlaying)
+                        {
+                            dialogueStep++;
+
+                            // Si on a lu toutes les lignes
+                            if (dialogueStep >= currentTalkingSlime.dialogue.Count)
+                            {
+                                isInDialogue = false;          // On ferme la boîte de dialogue
+
+                                if (currentTalkingSlime == slimeW)
+                                {
+                                    canWallJump = true;
+                                }
+                                else if (currentTalkingSlime == slimeA)
+                                {
+                                    canSwim = true;
+                                }
+                                else if (currentTalkingSlime == slimeF)
+                                {
+                                    isSwordrepaired = true;
+                                }
+                                // Passer le bon slime en allié
+                                if (currentTalkingSlime != slimeF)
+                                {
+                                    currentTalkingSlime.isAllied = true;
+                                }
+                                // Réinitialiser la référence
+                                currentTalkingSlime = null;
+                            }
+                        }
+                    }
+                    if (isSwordrepaired && playerpos.X > 10000)
+                    {
+                        isGameEnded = true;
+                    }
+
+                    foreach (var death in deathZone)
+                    {
+                        if (Raylib.CheckCollisionRecs(player, death.Hitbox))
+                        {
+
+                            playerpos = death.respawnLocation;
+                            player.X = death.respawnLocation.X;
+                            player.Y = death.respawnLocation.Y;
+
+                            // On coupe net les vitesses pour éviter qu'il garde son élan de chute
+                            downspeed = 0;
+                            currentSpeedX = 0;
+                            coyoteTimeCounter = 0;
+                        }
+                    }
+
+                    if (waterTime <= 0)
+                    {
+                        // Téléportation au dernier sol stable
+                        playerpos = lastSafePosition;
+                        player.X = playerpos.X;
+                        player.Y = playerpos.Y;
 
                         // On coupe net les vitesses pour éviter qu'il garde son élan de chute
                         downspeed = 0;
                         currentSpeedX = 0;
                         coyoteTimeCounter = 0;
+
+
+                        //reset du temps
+                        waterTime = 5;
                     }
                 }
-
-                if (waterTime <= 0)
+                else
                 {
-                    // Téléportation au dernier sol stable
-                    playerpos = lastSafePosition;
-                    player.X = playerpos.X;
-                    player.Y = playerpos.Y;
+                    bgScrollX += bgSpeed * deltaTime;
+                    groundScrollX += groundSpeed * deltaTime;
 
-                    // On coupe net les vitesses pour éviter qu'il garde son élan de chute
-                    downspeed = 0;
-                    currentSpeedX = 0;
-                    coyoteTimeCounter = 0;
+                    // Mettre à jour l'animation de marche du joueur
+                    frameTimer += deltaTime;
+                    if (frameTimer >= frameSpeed)
+                    {
+                        frameTimer = 0.0f;
+                        currentFrame = (currentFrame + 1) % totalFrames;
+                    }
 
-
-                    //reset du temps
-                    waterTime = 5;
+                    // Force une largeur POSITIVE et la bonne frame pour la cinématique
+                    sourceRec = new Rectangle(currentFrame * frameWidth, 0, frameWidth, frameHeight);
                 }
 
                 // --- 8. RENDU / DESSIN ---
                 Raylib.BeginTextureMode(gameTarget);
                 Raylib.ClearBackground(Color.SkyBlue);
-                Raylib.BeginMode2D(camera);
-                foreach (var death in deathZone)
+                
+                if (!isGameEnded)
                 {
-                    if (death.type == "void")
+                    Raylib.BeginMode2D(camera);
+                    foreach (var death in deathZone)
                     {
-                        Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
+                        if (death.type == "void")
+                        {
+                            Raylib.DrawRectangleRec(death.Hitbox, Raylib.Fade(Color.Black, 0.4f));
+                        }
+                        else if (death.type == "spike")
+                        {
+                            Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                        }
+                        else if (death.type == "movingObjectL/R" || death.type == "movingObjectU/D")
+                        {
+                            Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                        }
                     }
-                    else if (death.type == "spike")
+
+                    foreach (var plat in platforms)
                     {
-                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                        Raylib.DrawRectangleRec(plat, new Color(46, 63, 89, 255));
                     }
-                    else if (death.type == "movingObjectL/R" || death.type == "movingObjectU/D")
+                    foreach (var plat in noWalljumpPlatforms)
                     {
-                        Raylib.DrawRectangleRec(death.Hitbox, new Color(154, 121, 73, 255));
+                        Raylib.DrawRectangleRec(plat, new Color(22, 31, 43, 255));
                     }
-                }
 
-                foreach (var plat in platforms)
-                {
-                    Raylib.DrawRectangleRec(plat, new Color(46, 63, 89, 255));
-                }
-                foreach (var plat in noWalljumpPlatforms)
-                {
-                    Raylib.DrawRectangleRec(plat, new Color(22, 31, 43, 255));
-                }
-
-                foreach (var gla in ice)
-                {
-                    Raylib.DrawRectangleRec(gla, new Color(73, 232, 255, 255));
-                }
-
-                float currentOffsetX = offsetX;
-                if (flipX < 0)
-                {
-                    currentOffsetX = spriteRenderWidth - hitboxWidth - offsetX;
-                }
-
-                Rectangle destRec = new Rectangle(
-                    player.X - currentOffsetX,
-                    player.Y - offsetY,
-                    spriteRenderWidth,
-                    spriteRenderHeight
-                );
-
-                foreach (var wat in water)
-                {
-                    Raylib.DrawRectangleRec(wat, Raylib.Fade(Color.Blue, 0.4f));
-                }
-
-                foreach (var stal in stalactites)
-                {
-                    if (stal.IsDestroyed) continue;
-
-                    // AFFICHER LA ZONE DE DÉTECTION
-                    Raylib.DrawRectangleRec(stal.DetectionZone, Raylib.Fade(Color.Orange, 0.1f));
-
-                    // DESSINER LA STALACTITE
-                    if (stal.Type == "glace")
+                    foreach (var gla in ice)
                     {
-                        Raylib.DrawRectangleRec(stal.Hitbox, new Color(200, 245, 255, 255));
+                        Raylib.DrawRectangleRec(gla, new Color(73, 232, 255, 255));
                     }
-                    else if (stal.Type == "normal")
+
+                    float currentOffsetX = offsetX;
+                    if (flipX < 0)
                     {
-                        Raylib.DrawRectangleRec(stal.Hitbox, new Color(61, 84, 117, 255));
+                        currentOffsetX = spriteRenderWidth - hitboxWidth - offsetX;
                     }
-                }
 
-                // Dessiner le levier (Rouge = Fermé, Vert = Ouvert)
-                Color slimeWLeverColor = slimeWLeverActivated ? Color.Green : Color.Red;
-                Raylib.DrawRectangleRec(slimeWLeverTrigger, slimeWLeverColor);
-
-                Color MotherFlameLeverColor = MotherFlameLeverActivated ? Color.Green : Color.Red;
-                Raylib.DrawRectangleRec(MotherFlameLeverTrigger, MotherFlameLeverColor);
-
-                // Dessiner la barrière seulement si elle est fermée
-                if (!slimeWLeverActivated)
-                {
-                    Raylib.DrawRectangleRec(slimeWBarrier, Raylib.Fade(Color.Gray, 0.8f));
-                }
-                if (!MotherFlameLeverActivated)
-                {
-                    Raylib.DrawRectangleRec(MotherFlameBarrier, Raylib.Fade(Color.Gray, 0.8f));
-                }
-
-                foreach (var slime in slimes)
-                {
-                    // On ne le dessine que s'il n'est pas encore allié
-                    if (!slime.isAllied)
-                    {
-                        Raylib.DrawRectangleRec(slime.body, slime.Color);
-                    }
-                }
-
-                Vector2 origin = new Vector2(0, 0);
-                if (isSwordrepaired)
-                {
-                    currentSprite = knightSpriteRepaired;
-                }
-                ;
-                Raylib.DrawTexturePro(
-                    currentSprite,
-                    sourceRec,
-                    destRec,
-                    origin,
-                    0.0f,
-                    Color.White
-                );
-
-                Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
-
-                if (!devMode)
-                {
-                    // --- DESSINER L'OMBRE AUTOUR DU JOUEUR ---
-
-                    // Rectangle source de la texture (Inversé sur Y comme toujours dans Raylib)
-                    Rectangle maskSrcRec = new Rectangle(0, 0, lightMask.Texture.Width, -lightMask.Texture.Height);
-
-                    // Rectangle de destination centré sur le joueur
-                    Rectangle maskDestRec = new Rectangle(
-                        playerpos.X + player.Width / 2 - lightSize / 2f,
-                        playerpos.Y + player.Height / 2 - lightSize / 2f,
-                        lightSize,
-                        lightSize
+                    Rectangle destRec = new Rectangle(
+                        player.X - currentOffsetX,
+                        player.Y - offsetY,
+                        spriteRenderWidth,
+                        spriteRenderHeight
                     );
 
-                    // Dessin de la lumière
-                    Raylib.DrawTexturePro(lightMask.Texture, maskSrcRec, maskDestRec, Vector2.Zero, 0f, Color.White);
+                    foreach (var wat in water)
+                    {
+                        Raylib.DrawRectangleRec(wat, Raylib.Fade(Color.Blue, 0.4f));
+                    }
 
-                    // 2. Remplir le reste de la carte autour du carré de lumière
-                    Raylib.DrawRing(new Vector2(playerpos.X + player.Width / 2, playerpos.Y + player.Height / 2), lightSize / 2 - 2, 5000f, 0, 360, 60, new Color(0, 0, 0, 255));
+                    foreach (var stal in stalactites)
+                    {
+                        if (stal.IsDestroyed) continue;
 
+                        // AFFICHER LA ZONE DE DÉTECTION
+                        Raylib.DrawRectangleRec(stal.DetectionZone, Raylib.Fade(Color.Orange, 0.1f));
+
+                        // DESSINER LA STALACTITE
+                        if (stal.Type == "glace")
+                        {
+                            Raylib.DrawRectangleRec(stal.Hitbox, new Color(200, 245, 255, 255));
+                        }
+                        else if (stal.Type == "normal")
+                        {
+                            Raylib.DrawRectangleRec(stal.Hitbox, new Color(61, 84, 117, 255));
+                        }
+                    }
+
+                    // Dessiner le levier (Rouge = Fermé, Vert = Ouvert)
+                    Color slimeWLeverColor = slimeWLeverActivated ? Color.Green : Color.Red;
+                    Raylib.DrawRectangleRec(slimeWLeverTrigger, slimeWLeverColor);
+
+                    Color MotherFlameLeverColor = MotherFlameLeverActivated ? Color.Green : Color.Red;
+                    Raylib.DrawRectangleRec(MotherFlameLeverTrigger, MotherFlameLeverColor);
+
+                    // Dessiner la barrière seulement si elle est fermée
+                    if (!slimeWLeverActivated)
+                    {
+                        Raylib.DrawRectangleRec(slimeWBarrier, Raylib.Fade(Color.Gray, 0.8f));
+                    }
+                    if (!MotherFlameLeverActivated)
+                    {
+                        Raylib.DrawRectangleRec(MotherFlameBarrier, Raylib.Fade(Color.Gray, 0.8f));
+                    }
+
+                    foreach (var slime in slimes)
+                    {
+                        // On ne le dessine que s'il n'est pas encore allié
+                        if (!slime.isAllied)
+                        {
+                            Raylib.DrawRectangleRec(slime.body, slime.Color);
+                        }
+                    }
+
+                    Vector2 origin = new Vector2(0, 0);
+                    if (isSwordrepaired)
+                    {
+                        currentSprite = knightSpriteRepaired;
+                    }
+                    ;
+
+                    Raylib.DrawTexturePro(
+                        currentSprite,
+                        sourceRec,
+                        destRec,
+                        origin,
+                        0.0f,
+                        Color.White
+                    );
+
+                    Raylib.DrawRectangleRec(player, Raylib.Fade(Color.Red, 0.4f));
+
+                    if (!devMode)
+                    {
+                        // --- DESSINER L'OMBRE AUTOUR DU JOUEUR ---
+
+                        // Rectangle source de la texture (Inversé sur Y comme toujours dans Raylib)
+                        Rectangle maskSrcRec = new Rectangle(0, 0, lightMask.Texture.Width, -lightMask.Texture.Height);
+
+                        // Rectangle de destination centré sur le joueur
+                        Rectangle maskDestRec = new Rectangle(
+                            playerpos.X + player.Width / 2 - lightSize / 2f,
+                            playerpos.Y + player.Height / 2 - lightSize / 2f,
+                            lightSize,
+                            lightSize
+                        );
+
+                        // Dessin de la lumière
+                        Raylib.DrawTexturePro(lightMask.Texture, maskSrcRec, maskDestRec, Vector2.Zero, 0f, Color.White);
+
+                        // 2. Remplir le reste de la carte autour du carré de lumière
+                        Raylib.DrawRing(new Vector2(playerpos.X + player.Width / 2, playerpos.Y + player.Height / 2), lightSize / 2 - 2, 5000f, 0, 360, 60, new Color(0, 0, 0, 255));
+
+                    }
+                    else
+                    {
+                        Raylib.DrawText($"Player Pos: {playerpos.X}, {playerpos.Y}", (int)playerpos.X - (int)50, (int)playerpos.Y - (int)50, 20, Color.Black);
+                    }
+                    Raylib.EndMode2D();
+
+                    // --- RENDU DU DIALOGUE (FIXE À L'ÉCRAN) ---
+                    if (isInDialogue)
+                    {
+
+                        // Dimensions de la boîte de dialogue
+                        int boxWidth = screenWidth - 100;
+                        int boxHeight = 150;
+                        int boxX = 50;
+                        int boxY = screenHeight - boxHeight - 50;
+
+                        // Fond noir semi-transparent et bordure blanche
+                        Raylib.DrawRectangle(boxX, boxY, boxWidth, boxHeight, Raylib.Fade(Color.Black, 0.85f));
+                        Raylib.DrawRectangleLines(boxX, boxY, boxWidth, boxHeight, Color.White);
+
+                        // Affichage du texte de l'étape actuelle
+                        Raylib.DrawText(currentTalkingSlime.dialogue[dialogueStep], boxX + 30, boxY + 40, 24, Color.White);
+
+                        // Petit indicateur pour passer au texte suivant
+                        Raylib.DrawText("[E] ou [Espace] pour continuer", boxX + boxWidth - 300, boxY + boxHeight - 30, 16, Color.Gray);
+                    }
                 }
                 else
                 {
-                    Raylib.DrawText($"Player Pos: {playerpos.X}, {playerpos.Y}", (int)playerpos.X - (int)50, (int)playerpos.Y - (int)50, 20, Color.Black);
-                }
-                Raylib.EndMode2D();
+                    // 1. Fond des montagnes
+                    // On dessine le fond sur toute la surface du RenderTarget
+                    Rectangle bgSource = new Rectangle(bgScrollX, 0, bgEnd.Width, bgEnd.Height);
+                    Rectangle bgDest = new Rectangle(0, 0, gameTarget.Texture.Width, gameTarget.Texture.Height);
+                    Raylib.DrawTexturePro(bgEnd, bgSource, bgDest, Vector2.Zero, 0.0f, Color.White);
 
-                // --- RENDU DU DIALOGUE (FIXE À L'ÉCRAN) ---
-                if (isInDialogue)
-                {
+                    // 2. Sol 16x16
+                    float groundScale = 4.0f;
+                    float groundHeight = groundEnd.Height * groundScale;
+                    float groundY = gameTarget.Texture.Height - groundHeight;
 
-                    // Dimensions de la boîte de dialogue
-                    int boxWidth = screenWidth - 100;
-                    int boxHeight = 150;
-                    int boxX = 50;
-                    int boxY = screenHeight - boxHeight - 50;
+                    // Répétition propre du sol
+                    Rectangle groundSource = new Rectangle(groundScrollX, 0, gameTarget.Texture.Width / groundScale, groundEnd.Height);
+                    Rectangle groundDest = new Rectangle(0, groundY, gameTarget.Texture.Width, groundHeight);
+                    Raylib.DrawTexturePro(groundEnd, groundSource, groundDest, Vector2.Zero, 0.0f, Color.White);
 
-                    // Fond noir semi-transparent et bordure blanche
-                    Raylib.DrawRectangle(boxX, boxY, boxWidth, boxHeight, Raylib.Fade(Color.Black, 0.85f));
-                    Raylib.DrawRectangleLines(boxX, boxY, boxWidth, boxHeight, Color.White);
+                    // 3. Joueur fixe
+                    float playerX = 200.0f;
+                    float playerY = groundY - (frameHeight * frameScale);
 
-                    // Affichage du texte de l'étape actuelle
-                    Raylib.DrawText(currentTalkingSlime.dialogue[dialogueStep], boxX + 30, boxY + 40, 24, Color.White);
+                    Rectangle playerDest = new Rectangle(
+                        playerX,
+                        playerY,
+                        frameWidth * frameScale,
+                        frameHeight * frameScale
+                    );
 
-                    // Petit indicateur pour passer au texte suivant
-                    Raylib.DrawText("[E] ou [Espace] pour continuer", boxX + boxWidth - 300, boxY + boxHeight - 30, 16, Color.Gray);
+                    Texture2D spriteToDraw = isSwordrepaired ? knightSpriteRepaired : currentSprite;
+
+                    Raylib.DrawTexturePro(
+                        spriteToDraw,
+                        sourceRec,
+                        playerDest,
+                        Vector2.Zero,
+                        0.0f,
+                        Color.White
+                    );
+
+                    // 4. Textes
+                    string titleText = "VICTOIRE !";
+                    int titleSize = 50;
+                    int titleWidth = Raylib.MeasureText(titleText, titleSize);
+                    Raylib.DrawText(titleText, gameTarget.Texture.Width / 2 - titleWidth / 2, 80, titleSize, Color.Gold);
+
+                    string subText = "L'épée est réparée. Le héros rentre chez lui...";
+                    int subSize = 20;
+                    int subWidth = Raylib.MeasureText(subText, subSize);
+                    Raylib.DrawText(subText, gameTarget.Texture.Width / 2 - subWidth / 2, 150, subSize, Color.White);
                 }
 
                 Raylib.EndTextureMode();
@@ -1590,6 +1693,8 @@ namespace RaylibTest
             Raylib.CloseWindow();
             Raylib.UnloadTexture(knightSpriteBase);
             Raylib.UnloadTexture(knightSpriteRepaired);
+            Raylib.UnloadTexture(bgEnd);
+            Raylib.UnloadTexture(groundEnd);
             Raylib.UnloadRenderTexture(lightMask);
             Raylib.UnloadRenderTexture(gameTarget);
             Raylib.UnloadShader(blurShader);
